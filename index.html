@@ -155,6 +155,8 @@
 
         /* --- Accounting / Management Styles --- */
         .accounts-grid { display: grid; grid-template-columns: 1.5fr 1fr; gap: 30px; }
+        .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+
         .expense-panel { background: var(--white); padding: 30px; border-radius: 20px; box-shadow: var(--shadow); }
         .expense-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
         .expense-input-group label { display: block; font-size: 0.85rem; color: var(--gray); margin-bottom: 8px; font-weight: 500; }
@@ -253,6 +255,22 @@
         .map-container {
             width: 100%; height: 500px; border-radius: 15px; overflow: hidden; margin-top: 20px;
             box-shadow: var(--shadow); border: 1px solid #eee; z-index: 1;
+        }
+
+        /* --- Mobile Responsiveness --- */
+        @media (max-width: 768px) {
+            .nav-container { flex-direction: column; align-items: flex-start; }
+            .role-toggle { width: 100%; justify-content: space-between; margin-top: 10px; }
+            .role-btn { flex: 1; text-align: center; padding: 8px 10px; font-size: 0.8rem; }
+            
+            .accounts-grid { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .expense-form-grid { grid-template-columns: 1fr; }
+            
+            .profit-summary { margin-top: 20px; }
+            .modal-content { width: 90%; margin: 0 20px; padding: 20px; }
+            .controls-bar { flex-direction: column; align-items: stretch; }
+            .expense-table th, .expense-table td { font-size: 0.75rem; padding: 8px; }
         }
     </style>
 </head>
@@ -440,7 +458,7 @@
                 inventory: this.inventory, 
                 transactions: this.transactions, 
                 expenditures: this.expenditures, 
-                targets: this.targets,
+                targets: this.targets, 
                 refunds: this.refunds
             };
             try {
@@ -639,7 +657,7 @@
                         <div class="kpi-card warning"><div class="kpi-title">Occupancy</div><div class="kpi-value">${occupancyRate}%</div></div>
                     </div>
 
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-bottom:30px;">
+                    <div class="charts-grid">
                         <div style="background:white; padding:20px; border-radius:15px; box-shadow:var(--shadow);">
                             <canvas id="revChart"></canvas>
                         </div>
