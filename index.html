@@ -112,6 +112,7 @@
         .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #ccc; }
         .sync-dot.online { background: var(--success); box-shadow: 0 0 5px var(--success); }
         .sync-dot.syncing { background: var(--warning); animation: pulse-yellow 1s infinite; }
+        .sync-dot.offline { background: var(--danger); }
 
         @keyframes pulse-yellow { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
 
@@ -189,10 +190,13 @@
         }
 
         /* --- Tabs --- */
-        .mgmt-tabs { display: flex; gap: 10px; margin-bottom: 20px; }
+        .mgmt-tabs { 
+            display: flex; gap: 10px; margin-bottom: 20px; 
+            overflow-x: auto; -webkit-overflow-scrolling: touch; padding-bottom: 5px;
+        }
         .mgmt-tab { 
             padding: 10px 20px; border-radius: 10px; background: #eee; cursor: pointer; 
-            font-weight: 500; font-size: 0.9rem; transition: 0.2s;
+            font-weight: 500; font-size: 0.9rem; transition: 0.2s; white-space: nowrap;
         }
         .mgmt-tab.active { background: var(--dark); color: white; }
 
@@ -257,20 +261,51 @@
             box-shadow: var(--shadow); border: 1px solid #eee; z-index: 1;
         }
 
+        /* --- Notification Toast --- */
+        #notification-container {
+            position: fixed; top: 20px; right: 20px; z-index: 3000;
+            display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+        }
+        .notification {
+            background: white; padding: 15px 20px; border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            display: flex; align-items: center; gap: 12px;
+            animation: slideIn 0.3s ease-out; min-width: 280px; max-width: 90vw;
+            border-left: 5px solid #ccc; pointer-events: all;
+            font-size: 0.9rem; font-weight: 500;
+        }
+        .notification.success { border-left-color: var(--success); color: var(--success); }
+        .notification.error { border-left-color: var(--danger); color: var(--danger); }
+        .notification.info { border-left-color: var(--blue); color: var(--blue); }
+        
+        @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        @keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(100%); opacity: 0; } }
+
         /* --- Mobile Responsiveness --- */
         @media (max-width: 768px) {
-            .nav-container { flex-direction: column; align-items: flex-start; }
-            .role-toggle { width: 100%; justify-content: space-between; margin-top: 10px; }
-            .role-btn { flex: 1; text-align: center; padding: 8px 10px; font-size: 0.8rem; }
-            
-            .accounts-grid { grid-template-columns: 1fr; }
-            .charts-grid { grid-template-columns: 1fr; }
+            .nav-container { flex-direction: column; align-items: flex-start; gap: 10px; }
+            .brand { width: 100%; text-align: center; margin-bottom: 5px; }
+            .role-toggle { width: 100%; justify-content: space-between; }
+            .role-btn { flex: 1; text-align: center; padding: 8px 5px; font-size: 0.8rem; }
+            .sync-indicator { width: 100%; justify-content: center; margin-top: 5px; }
+
+            .accounts-grid { grid-template-columns: 1fr; gap: 20px; }
+            .charts-grid { grid-template-columns: 1fr; gap: 20px; }
             .expense-form-grid { grid-template-columns: 1fr; }
             
-            .profit-summary { margin-top: 20px; }
-            .modal-content { width: 90%; margin: 0 20px; padding: 20px; }
-            .controls-bar { flex-direction: column; align-items: stretch; }
-            .expense-table th, .expense-table td { font-size: 0.75rem; padding: 8px; }
+            .profit-summary { margin-top: 0; }
+            .modal-content { width: 90%; margin: 0 5%; padding: 20px; max-height: 85vh; }
+            .controls-bar { flex-direction: column; align-items: stretch; padding: 15px; }
+            .control-group { width: 100%; min-width: unset; }
+            
+            .mgmt-tabs { margin-bottom: 15px; }
+            .mgmt-tab { padding: 8px 15px; font-size: 0.85rem; }
+
+            .cards-grid { grid-template-columns: 1fr; } /* Full width cards on mobile */
+            .map-container { height: 350px; }
+            
+            h2 { font-size: 1.3rem; }
+            h3 { font-size: 1.1rem; }
         }
     </style>
 </head>
@@ -292,6 +327,7 @@
 </header>
 
 <div class="container" id="appContainer"></div>
+<div id="notification-container"></div>
 
 <!-- PIN MODAL -->
 <div id="pinModal" class="modal">
@@ -393,6 +429,26 @@
             await this.syncFromCloud();
         }
 
+        showNotification(message, type = 'info') {
+            const container = document.getElementById('notification-container');
+            const div = document.createElement('div');
+            div.className = `notification ${type}`;
+            
+            // Icon handling based on type
+            let icon = 'ℹ️';
+            if(type === 'success') icon = '✅';
+            if(type === 'error') icon = '⚠️';
+
+            div.innerHTML = `<span>${icon}</span> <span>${message}</span>`;
+            container.appendChild(div);
+
+            // Auto dismiss
+            setTimeout(() => {
+                div.style.animation = 'slideOut 0.3s ease-in forwards';
+                setTimeout(() => div.remove(), 300);
+            }, 4000);
+        }
+
         setupPinEnter() {
             const pinInput = document.getElementById('rolePinInput');
             if (pinInput) {
@@ -407,20 +463,16 @@
 
         getInitialInventory() {
             let inv = [];
-            
             // Katampe (Hilltop) - 6 units
             for(let i=1; i<=3; i++) inv.push({ id: `h_4bed_${i}`, loc: 'Hilltop', name: `4 Bed Duplex ${i}`, price: 250000, status: 'available' });
             for(let i=1; i<=3; i++) inv.push({ id: `h_1bed_${i}`, loc: 'Hilltop', name: `1 Bed Apt ${i}`, price: 80000, status: 'available' });
-
             // Jahi - 8 units
             for(let i=1; i<=2; i++) inv.push({ id: `j_3bed_${i}`, loc: 'Jahi', name: `3 Bed Apt ${i}`, price: 150000, status: 'available' });
             for(let i=1; i<=4; i++) inv.push({ id: `j_2bed_${i}`, loc: 'Jahi', name: `2 Bed Apt ${i}`, price: 120000, status: 'available' });
             for(let i=1; i<=2; i++) inv.push({ id: `j_1bed_${i}`, loc: 'Jahi', name: `1 Bed Apt ${i}`, price: 70000, status: 'available' });
-
             // Gwarinpa (The White House) - 6 units
             for(let i=1; i<=3; i++) inv.push({ id: `w_studio_${i}`, loc: 'The White House', name: `Studio ${i}`, price: 40000, status: 'available' });
             for(let i=1; i<=3; i++) inv.push({ id: `w_1bed_${i}`, loc: 'The White House', name: `1 Bed Apt ${i}`, price: 50000, status: 'available' });
-
             return inv;
         }
 
@@ -446,15 +498,24 @@
             this.updateSyncUI('syncing');
             try {
                 const res = await fetch(this.googleScriptUrl);
+                if (!res.ok) throw new Error(`Server Error (${res.status})`);
+                
                 const data = await res.json();
+                if (data.status === 'error') throw new Error(data.message);
+
                 if (data.inventory?.length > 0) this.inventory = data.inventory;
                 if (data.transactions) this.transactions = data.transactions;
                 if (data.expenditures) this.expenditures = data.expenditures;
                 if (data.targets) this.targets = data.targets;
                 if (data.refunds) this.refunds = data.refunds;
-                this.saveLocalData(); 
+                
                 this.updateSyncUI('online');
-            } catch (e) { this.updateSyncUI('offline'); }
+                // Don't toast on every background sync to avoid spamming
+            } catch (e) { 
+                this.updateSyncUI('offline');
+                console.error("Sync Failed:", e);
+                this.showNotification(`Cloud Sync Failed: ${e.message}`, 'error');
+            }
         }
 
         async syncToCloud() {
@@ -468,8 +529,18 @@
             };
             try {
                 const res = await fetch(this.googleScriptUrl, { method: 'POST', body: JSON.stringify(payload) });
-                if ((await res.json()).status === 'success') this.updateSyncUI('online');
-            } catch (e) { this.updateSyncUI('offline'); }
+                if (!res.ok) throw new Error(`Server Error (${res.status})`);
+                
+                const json = await res.json();
+                if (json.status === 'success') {
+                    this.updateSyncUI('online');
+                } else {
+                    throw new Error(json.message || "Unknown error");
+                }
+            } catch (e) { 
+                this.updateSyncUI('offline');
+                this.showNotification(`Data Save Failed: ${e.message}`, 'error');
+            }
         }
 
         render() {
@@ -896,7 +967,10 @@
             const amt = parseFloat(document.getElementById('expAmt').value);
             const sid = document.getElementById('expStaffId').value;
             const scope = document.getElementById('expUnit').value;
-            if(!amt || !sid) return;
+            if(!amt || !sid) {
+                 this.showNotification("Please fill amount and Staff ID", "error");
+                 return;
+            }
             this.expenditures.push({
                 amount: amt, date: document.getElementById('expDate').value,
                 category: document.getElementById('expCat').value,
@@ -904,6 +978,7 @@
                 description: document.getElementById('expDesc').value, staffId: sid
             });
             this.saveLocalData();
+            this.showNotification("Expenditure recorded successfully", "success");
         }
 
         addRefund() {
@@ -913,14 +988,17 @@
             const staff = document.getElementById('refStaffId').value;
             const date = document.getElementById('refDate').value;
 
-            if(!guest || isNaN(amt) || !reason) return alert("Please fill all fields");
+            if(!guest || isNaN(amt) || !reason) {
+                this.showNotification("Please fill all fields", "error");
+                return;
+            }
 
             this.refunds.push({
                 date, guest, amount: amt, reason, staffId: staff
             });
             
             this.saveLocalData();
-            alert("Refund request submitted successfully.");
+            this.showNotification("Refund request submitted successfully", "success");
             // Clear form
             document.getElementById('refGuest').value = '';
             document.getElementById('refAmount').value = '';
@@ -940,8 +1018,9 @@
             if(p === this.rolePins[this.pendingRole]) { 
                 this.setRole(this.pendingRole); 
                 this.closeModal(); 
+                this.showNotification(`Welcome, ${this.pendingRole.charAt(0).toUpperCase() + this.pendingRole.slice(1)}`, "success");
             } else { 
-                alert("Incorrect Access PIN"); 
+                this.showNotification("Incorrect Access PIN", "error");
             }
         }
         
@@ -961,9 +1040,9 @@
                 this.targets[key] = val;
                 this.saveLocalData();
                 this.closeModal();
-                alert(`Target for ${loc} (${month}) updated to ${this.formatCurrency(val)}`);
+                this.showNotification(`Target for ${loc} (${month}) updated to ${this.formatCurrency(val)}`, "success");
             } else {
-                alert("Please select location, month, and amount.");
+                this.showNotification("Please select location, month, and amount.", "error");
             }
         }
 
@@ -976,7 +1055,7 @@
         }
         
         setMgmtTab(t) { this.activeMgmtTab = t; this.render(); }
-        deleteExpenditure(idx) { this.expenditures.splice(idx,1); this.saveLocalData(); }
+        deleteExpenditure(idx) { this.expenditures.splice(idx,1); this.saveLocalData(); this.showNotification("Item deleted", "info"); }
         formatCurrency(n) { return "₦" + Math.round(n).toLocaleString(); }
         updateDate(t,v) { t==='from'?this.dateFrom=v:this.dateTo=v; this.render(); }
         updateMgmtFilter(v) { this.managementFilter = v; this.render(); }
@@ -984,7 +1063,9 @@
         updateSort(v) { this.sortBy = v; this.render(); }
         updateSyncUI(s) {
             const dot = document.getElementById('syncDot');
-            dot.className = `sync-dot ${s === 'online' ? 'online' : s === 'syncing' ? 'syncing' : ''}`;
+            dot.className = `sync-dot ${s === 'online' ? 'online' : s === 'syncing' ? 'syncing' : 'offline'}`;
+            const statusText = document.getElementById('syncStatus');
+            if(statusText) statusText.innerText = s === 'online' ? 'Cloud Synced' : s === 'syncing' ? 'Syncing...' : 'Offline Mode';
         }
         closeModal() { document.querySelectorAll('.modal').forEach(m => { m.classList.remove('show'); setTimeout(()=>m.style.display='none',300); }); }
 
@@ -1011,18 +1092,23 @@
             const p = this.inventory.find(i => i.id === this.activeModalPropId);
             const paid = parseFloat(document.getElementById('actualPaid').value);
             const guest = document.getElementById('guestName').value;
-            if(!p || !guest || !paid) return;
+            if(!p || !guest || !paid) {
+                 this.showNotification("Please complete all booking details", "error");
+                 return;
+            }
             p.status = 'occupied';
             p.guestName = guest;
             this.transactions.push({ date: new Date().toISOString().split('T')[0], propId: p.id, amount: paid, guest });
             this.saveLocalData();
             this.closeModal();
+            this.showNotification("Booking confirmed!", "success");
         }
 
         checkout(id) {
             const p = this.inventory.find(i => i.id === id);
             p.status = 'available';
             this.saveLocalData();
+            this.showNotification("Guest checked out", "info");
         }
     }
     const app = new AmadaApp();
