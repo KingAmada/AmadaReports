@@ -406,16 +406,21 @@
         }
 
         getInitialInventory() {
-            let inv = [
-                { id: 'k1', loc: 'Hilltop', name: '4 Bed Duplex 1', price: 250000, status: 'available' },
-                { id: 'k2', loc: 'Hilltop', name: '4 Bed Duplex 2', price: 250000, status: 'available' },
-                { id: 'k3', loc: 'Hilltop', name: '1 Bed Apt A', price: 80000, status: 'available' },
-                { id: 'j1', loc: 'Jahi', name: '2 Bed Apt (A)', price: 120000, status: 'available' },
-                { id: 'j2', loc: 'Jahi', name: '1 Bed Apt (B)', price: 70000, status: 'available' },
-                { id: 'j3', loc: 'Jahi', name: 'Studio (X)', price: 50000, status: 'available' },
-                { id: 'g1', loc: 'The White House', name: 'Studio Unit 1', price: 40000, status: 'available' },
-                { id: 'g2', loc: 'The White House', name: '1 Bed Unit A', price: 50000, status: 'available' }
-            ];
+            let inv = [];
+            
+            // Katampe (Hilltop) - 6 units
+            for(let i=1; i<=3; i++) inv.push({ id: `h_4bed_${i}`, loc: 'Hilltop', name: `4 Bed Duplex ${i}`, price: 250000, status: 'available' });
+            for(let i=1; i<=3; i++) inv.push({ id: `h_1bed_${i}`, loc: 'Hilltop', name: `1 Bed Apt ${i}`, price: 80000, status: 'available' });
+
+            // Jahi - 8 units
+            for(let i=1; i<=2; i++) inv.push({ id: `j_3bed_${i}`, loc: 'Jahi', name: `3 Bed Apt ${i}`, price: 150000, status: 'available' });
+            for(let i=1; i<=4; i++) inv.push({ id: `j_2bed_${i}`, loc: 'Jahi', name: `2 Bed Apt ${i}`, price: 120000, status: 'available' });
+            for(let i=1; i<=2; i++) inv.push({ id: `j_1bed_${i}`, loc: 'Jahi', name: `1 Bed Apt ${i}`, price: 70000, status: 'available' });
+
+            // Gwarinpa (The White House) - 6 units
+            for(let i=1; i<=3; i++) inv.push({ id: `w_studio_${i}`, loc: 'The White House', name: `Studio ${i}`, price: 40000, status: 'available' });
+            for(let i=1; i<=3; i++) inv.push({ id: `w_1bed_${i}`, loc: 'The White House', name: `1 Bed Apt ${i}`, price: 50000, status: 'available' });
+
             return inv;
         }
 
