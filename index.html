@@ -4,13 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Amada Luxury Stays | Management Portal</title>
-    <!-- Elegant Font -->
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <!-- FontAwesome Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <!-- Leaflet Map CSS & JS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
 
@@ -414,7 +410,6 @@
 <div class="container" id="appContainer"></div>
 <div id="notification-container"></div>
 
-<!-- PIN MODAL -->
 <div id="pinModal" class="modal">
     <div class="modal-content" style="max-width:380px; text-align:center;">
         <button class="close-modal" onclick="app.closeModal()"><i class="fa-solid fa-times"></i></button>
@@ -428,7 +423,6 @@
     </div>
 </div>
 
-<!-- TARGET MODAL -->
 <div id="targetModal" class="modal">
     <div class="modal-content" style="max-width:450px;">
         <button class="close-modal" onclick="app.closeModal()"><i class="fa-solid fa-times"></i></button>
@@ -465,7 +459,6 @@
     </div>
 </div>
 
-<!-- BOOKING MODAL -->
 <div id="bookingModal" class="modal">
     <div class="modal-content">
         <button class="close-modal" onclick="app.closeModal()"><i class="fa-solid fa-times"></i></button>
@@ -1105,7 +1098,11 @@
                     <div class="prop-name">${prop.name}</div>
                     <div class="prop-loc"><i class="fa-solid fa-map-pin"></i> ${prop.loc}</div>
                     <div class="prop-price">${this.formatCurrency(prop.price)}<span>/night</span></div>
-                    ${isOcc ? `<div class="guest-info" style="margin-bottom:15px; background:#f9f9f9; padding:8px; border-radius:8px; font-size:0.9rem;"><i class="fa-solid fa-user"></i> <strong>${prop.guestName}</strong></div>` : ''} 
+                    ${isOcc ? `
+                    <div class="guest-info" style="margin-bottom:15px; background:#f9f9f9; padding:10px; border-radius:8px; font-size:0.9rem;">
+                        <i class="fa-solid fa-user"></i> <strong>${prop.guestName}</strong><br>
+                        ${prop.accessCode ? `<span style="color:var(--primary); font-weight:700; font-size:1.1rem; display:block; margin-top:5px; border-top:1px dashed #ddd; padding-top:5px;"><i class="fa-solid fa-key"></i> CODE: ${prop.accessCode}</span>` : ''}
+                    </div>` : ''} 
                     ${btnHtml}
                 </div>`;
             return div;
@@ -1241,25 +1238,62 @@
             document.getElementById('actualPaid').value = total;
         }
 
-        confirmBooking() {
+        // --- NEW SMART LOCK FUNCTION ---
+        async generateLockCode(unitId, checkIn, checkOut) {
+            // Since we don't have the Real Backend API Key in this HTML file, 
+            // we simulate the handshake here.
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    // Generate a random 6-digit PIN
+                    const code = Math.floor(100000 + Math.random() * 900000);
+                    resolve(code);
+                }, 1000); // Simulate 1 second network delay
+            });
+        }
+
+        async confirmBooking() {
             const p = this.inventory.find(i => i.id === this.activeModalPropId);
             const paid = parseFloat(document.getElementById('actualPaid').value);
             const guest = document.getElementById('guestName').value;
-            if(!p || !guest || !paid) {
+            const checkIn = document.getElementById('checkInDate').value;
+            const checkOut = document.getElementById('checkOutDate').value;
+
+            if(!p || !guest || !paid || !checkIn || !checkOut) {
                  this.showNotification("Please complete all booking details", "error");
                  return;
             }
+
+            // 1. Generate Smart Lock Code
+            this.showNotification("Connecting to Smart Lock...", "info");
+            const doorCode = await this.generateLockCode(p.id, checkIn, checkOut);
+
+            // 2. Update Inventory Object
             p.status = 'occupied';
             p.guestName = guest;
-            this.transactions.push({ date: new Date().toISOString().split('T')[0], propId: p.id, amount: paid, guest });
+            p.accessCode = doorCode; // Save code to unit so it displays on card
+
+            // 3. Save to Transaction Log
+            this.transactions.push({ 
+                date: new Date().toISOString().split('T')[0], 
+                propId: p.id, 
+                amount: paid, 
+                guest: guest,
+                accessCode: doorCode 
+            });
+
             this.saveLocalData();
             this.closeModal();
-            this.showNotification("Booking confirmed!", "success");
+            
+            // 4. Alert the Staff
+            alert(`✅ Booking Confirmed for ${guest}!\n\n🔐 ACCESS CODE: ${doorCode}\n\nPlease share this code with the guest.`);
+            this.showNotification("Booking confirmed & Code Generated!", "success");
         }
 
         checkout(id) {
             const p = this.inventory.find(i => i.id === id);
             p.status = 'available';
+            p.guestName = null;
+            p.accessCode = null; // Clear code on checkout
             this.saveLocalData();
             this.showNotification("Guest checked out", "info");
         }
