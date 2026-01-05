@@ -7,8 +7,8 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <style>
         :root {
@@ -329,6 +329,10 @@
             background: #f8f9fa; padding: 20px; border-radius: var(--radius-md); margin-bottom: 25px; 
             text-align: center; border: 2px dashed #e0e0e0; 
         }
+        
+        /* Spinner */
+        .spinner { border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 24px; height: 24px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; margin-right: 10px; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         /* Map Container */
         .map-container {
@@ -495,19 +499,30 @@
             <div class="input-wrapper"><i class="fa-solid fa-wallet"></i><input type="number" id="actualPaid" class="styled-input"></div>
         </div>
 
-        <button class="action-btn btn-save" onclick="app.confirmBooking()"><i class="fa-solid fa-paper-plane"></i> Confirm & Sync</button>
+        <button id="btnConfirm" class="action-btn btn-save" onclick="app.confirmBooking()"><i class="fa-solid fa-paper-plane"></i> Confirm & Sync</button>
     </div>
 </div>
 
 <script>
     class AmadaApp {
         constructor() {
+            // *** CRITICAL: PASTE YOUR DEPLOYED GOOGLE SCRIPT URL HERE ***
+            this.googleScriptUrl = "PASTE_YOUR_WEB_APP_URL_HERE";
+            
             this.role = 'staff';
             this.pendingRole = null;
             this.activeMgmtTab = 'pl'; 
             this.activeStaffTab = 'ops'; 
-            this.googleScriptUrl = "https://script.google.com/macros/s/AKfycbwfVJe5Kor2NYeiUz-mjj7zXDeBovXmclxLZ5U8WC5gust_Ad2s6fOxmOARyZV1ajQ4Sg/exec";
             
+            // *** CRITICAL: MAP YOUR PHYSICAL TUYA LOCK IDS HERE ***
+            // Example: 'h_4bed_1': 'eb583948754...',
+            this.LOCK_MAPPING = {
+                'h_4bed_1': 'REPLACE_WITH_TUYA_DEVICE_ID',
+                'h_1bed_1': 'REPLACE_WITH_TUYA_DEVICE_ID',
+                'j_3bed_1': 'REPLACE_WITH_TUYA_DEVICE_ID'
+                // Add all your units here
+            };
+
             this.rolePins = { 'management': '4444', 'chairman': '8888' };
             this.filters = { location: 'all', status: 'all' };
             this.managementFilter = 'all'; 
@@ -670,7 +685,6 @@
         // --- RENDER FUNCTIONS --- //
 
         renderManagementView(container) {
-            // ... Logic same as before ...
             let scopeProps = [...this.inventory];
             let targetLocs = Object.keys(this.reportBaselines);
 
@@ -795,7 +809,6 @@
         }
 
         renderChairmanDashboard(container) {
-            // ... Logic same as before ...
             let data = [...this.inventory];
             if (this.filters.location !== 'all') data = data.filter(i => i.loc === this.filters.location);
             if (this.sortBy === 'price_high') data.sort((a,b) => b.price - a.price);
@@ -1240,15 +1253,33 @@
 
         // --- NEW SMART LOCK FUNCTION ---
         async generateLockCode(unitId, checkIn, checkOut) {
-            // Since we don't have the Real Backend API Key in this HTML file, 
-            // we simulate the handshake here.
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    // Generate a random 6-digit PIN
-                    const code = Math.floor(100000 + Math.random() * 900000);
-                    resolve(code);
-                }, 1000); // Simulate 1 second network delay
-            });
+            const deviceId = this.LOCK_MAPPING[unitId];
+            
+            if (!deviceId || deviceId.includes('REPLACE')) {
+                console.warn("No Lock ID mapped for this unit");
+                return "MANUAL-KEY"; 
+            }
+
+            try {
+                const response = await fetch(this.googleScriptUrl, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'generateCode',
+                        deviceId: deviceId,
+                        checkIn: checkIn,
+                        checkOut: checkOut
+                    })
+                });
+                const data = await response.json();
+                
+                if (data.status === 'success') {
+                    return data.accessCode;
+                } else {
+                    return "OFFLINE";
+                }
+            } catch (e) {
+                return "OFFLINE";
+            }
         }
 
         async confirmBooking() {
@@ -1263,14 +1294,19 @@
                  return;
             }
 
+            // UI Feedback
+            const btn = document.getElementById('btnConfirm');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = `<div class="spinner"></div> Connecting...`;
+            btn.disabled = true;
+
             // 1. Generate Smart Lock Code
-            this.showNotification("Connecting to Smart Lock...", "info");
             const doorCode = await this.generateLockCode(p.id, checkIn, checkOut);
 
             // 2. Update Inventory Object
             p.status = 'occupied';
             p.guestName = guest;
-            p.accessCode = doorCode; // Save code to unit so it displays on card
+            p.accessCode = doorCode; 
 
             // 3. Save to Transaction Log
             this.transactions.push({ 
@@ -1287,6 +1323,10 @@
             // 4. Alert the Staff
             alert(`✅ Booking Confirmed for ${guest}!\n\n🔐 ACCESS CODE: ${doorCode}\n\nPlease share this code with the guest.`);
             this.showNotification("Booking confirmed & Code Generated!", "success");
+            
+            // Reset Button
+            btn.innerHTML = originalText;
+            btn.disabled = false;
         }
 
         checkout(id) {
