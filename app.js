@@ -217,7 +217,7 @@
             this.dateTo = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]; 
 
             this.targets = {}; 
-            this.inventory = [];
+            this.inventory = this.getInitialInventory();
             this.transactions = []; 
             this.expenditures = []; 
             this.refunds = [];
@@ -473,7 +473,73 @@
             }
         }
 
-        getInitialInventory() { return []; }
+        getInitialInventory() {
+            const premiumAmenities = [
+                { icon: 'fa-wifi', text: 'High-Speed WiFi' },
+                { icon: 'fa-snowflake', text: 'Air Conditioning' },
+                { icon: 'fa-tv', text: 'Smart TV & Netflix' },
+                { icon: 'fa-shield-halved', text: '24/7 Security' },
+                { icon: 'fa-bolt', text: '24/7 Power' },
+                { icon: 'fa-water-ladder', text: 'Private Pool' },
+                { icon: 'fa-dumbbell', text: 'Gym Access' }
+            ];
+            const standardAmenities = [
+                { icon: 'fa-wifi', text: 'High-Speed WiFi' },
+                { icon: 'fa-snowflake', text: 'Air Conditioning' },
+                { icon: 'fa-tv', text: 'Smart TV & Netflix' },
+                { icon: 'fa-shield-halved', text: '24/7 Security' },
+                { icon: 'fa-bolt', text: '24/7 Power' }
+            ];
+            const premiumImages = [
+                'https://images.unsplash.com/photo-1600607686527-6fb886090705?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+            ];
+            const standardImages = [
+                'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
+                'https://images.unsplash.com/photo-1505691938895-1758d7feb511?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
+            ];
+            const makeProperty = (id, loc, name, price, type, status, guestName, lat, lng, premium) => ({
+                id,
+                loc,
+                name,
+                price,
+                type,
+                status,
+                hostEmail: 'sarki@amada.com',
+                guestName: guestName || null,
+                accessCode: null,
+                coords: { lat, lng },
+                images: premium ? premiumImages : standardImages,
+                amenities: premium ? premiumAmenities : standardAmenities,
+                city: 'Abuja',
+                state: 'FCT'
+            });
+
+            return [
+                makeProperty('h_4bed_1', 'Katampe', 'Premium 4 Bed Duplex 1', 250000, '4-Bed Duplex', 'occupied', 'Aliko D.', 9.129424, 7.429680, true),
+                makeProperty('h_4bed_2', 'Katampe', 'Premium 4 Bed Duplex 2', 250000, '4-Bed Duplex', 'available', null, 9.129424, 7.429680, true),
+                makeProperty('h_4bed_3', 'Katampe', 'Premium 4 Bed Duplex 3', 250000, '4-Bed Duplex', 'occupied', 'Femi O.', 9.129424, 7.429680, true),
+                makeProperty('h_1bed_1', 'Katampe', 'Luxury 1 Bed Apt 1', 80000, '1 Bed', 'available', null, 9.129424, 7.429680, false),
+                makeProperty('h_1bed_2', 'Katampe', 'Luxury 1 Bed Apt 2', 80000, '1 Bed', 'available', null, 9.129424, 7.429680, false),
+                makeProperty('h_1bed_3', 'Katampe', 'Luxury 1 Bed Apt 3', 80000, '1 Bed', 'occupied', 'Tony E.', 9.129424, 7.429680, false),
+                makeProperty('j_3bed_1', 'Jahi', 'Executive 3 Bed Apt 1', 150000, '3 Bed', 'available', null, 9.103536, 7.425503, true),
+                makeProperty('j_3bed_2', 'Jahi', 'Executive 3 Bed Apt 2', 150000, '3 Bed', 'available', null, 9.103536, 7.425503, true),
+                makeProperty('j_2bed_1', 'Jahi', 'Standard 2 Bed Apt 1', 120000, '2 Bed', 'available', null, 9.103536, 7.425503, false),
+                makeProperty('j_2bed_2', 'Jahi', 'Standard 2 Bed Apt 2', 120000, '2 Bed', 'available', null, 9.103536, 7.425503, false),
+                makeProperty('j_2bed_3', 'Jahi', 'Standard 2 Bed Apt 3', 120000, '2 Bed', 'available', null, 9.103536, 7.425503, false),
+                makeProperty('j_2bed_4', 'Jahi', 'Standard 2 Bed Apt 4', 120000, '2 Bed', 'available', null, 9.103536, 7.425503, false),
+                makeProperty('j_1bed_1', 'Jahi', 'Standard 1 Bed Apt 1', 70000, '1 Bed', 'available', null, 9.103536, 7.425503, false),
+                makeProperty('j_1bed_2', 'Jahi', 'Standard 1 Bed Apt 2', 70000, '1 Bed', 'available', null, 9.103536, 7.425503, false),
+                makeProperty('w_studio_1', 'Gwarinpa', 'Classic Studio 1', 40000, 'Studio', 'available', null, 9.106198, 7.377890, false),
+                makeProperty('w_studio_2', 'Gwarinpa', 'Classic Studio 2', 40000, 'Studio', 'available', null, 9.106198, 7.377890, false),
+                makeProperty('w_studio_3', 'Gwarinpa', 'Classic Studio 3', 40000, 'Studio', 'available', null, 9.106198, 7.377890, false),
+                makeProperty('w_1bed_1', 'Gwarinpa', 'Classic 1 Bed Apt 1', 50000, '1 Bed', 'available', null, 9.106198, 7.377890, false),
+                makeProperty('w_1bed_2', 'Gwarinpa', 'Classic 1 Bed Apt 2', 50000, '1 Bed', 'available', null, 9.106198, 7.377890, false),
+                makeProperty('w_1bed_3', 'Gwarinpa', 'Classic 1 Bed Apt 3', 50000, '1 Bed', 'available', null, 9.106198, 7.377890, false)
+            ];
+        }
 
         getDefaultTeamMembers() { return []; }
 
@@ -897,6 +963,9 @@
             } catch (e) { 
                 this.updateSyncUI('offline');
                 console.warn("Supabase sync failed:", e);
+                if (!this.inventory.length) {
+                    this.inventory = this.getInitialInventory();
+                }
             }
         }
 

@@ -41,11 +41,11 @@
     <!-- MAIN HEADER -->
     <header id="mainHeader">
         <div class="nav-container">
-            <a href="#" class="brand" onclick="switchView('home')"><i class="fa-solid fa-crown"></i> Amada <span>Engine</span></a>
+            <a href="#" class="brand" onclick="switchView('home'); return false;"><i class="fa-solid fa-crown"></i> Amada <span>Engine</span></a>
             <div class="nav-links">
-                <a href="#" onclick="switchView('home')">Home</a>
-                <a href="#" onclick="openHostModal()">List Your Property</a>
-                <a href="#" onclick="switchView('guest')">Find a Stay</a>
+                <a href="#" onclick="switchView('home'); return false;">Home</a>
+                <a href="#" onclick="openHostModal(); return false;">List Your Property</a>
+                <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
                 <button class="btn-outline" onclick="openLoginModal()"><i class="fa-solid fa-lock"></i> Portal Login</button>
                 <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Become a Host</button>
             </div>
