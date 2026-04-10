@@ -26,6 +26,7 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -218,6 +219,71 @@
                         <input type="text" placeholder=" " onkeyup="if(window.app) window.app.updateGuestSearch(this.value)">
                         <label><i class="fa-solid fa-magnifying-glass"></i> Search location or name...</label>
                     </div>
+                </div>
+            </div>
+            <div class="panel" style="margin-bottom:24px;">
+                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; align-items:end;">
+                    <div class="input-floating" style="margin:0;">
+                        <select id="guestRoomsFilter" onchange="if(window.app) window.app.updateGuestFilter('rooms', this.value)">
+                            <option value="all" selected>All Rooms</option>
+                            <option value="0">Studio</option>
+                            <option value="1">1 Room</option>
+                            <option value="2">2 Rooms</option>
+                            <option value="3">3 Rooms</option>
+                            <option value="4">4+ Rooms</option>
+                        </select>
+                        <label style="top:5px; font-size:0.7rem;">Rooms</label>
+                    </div>
+                    <div class="input-floating" style="margin:0;">
+                        <select id="guestPriceRangeFilter" onchange="if(window.app) window.app.updateGuestFilter('priceRange', this.value)">
+                            <option value="all" selected>All Prices</option>
+                            <option value="0-50000">Up to ₦50,000</option>
+                            <option value="50001-100000">₦50,001 - ₦100,000</option>
+                            <option value="100001-150000">₦100,001 - ₦150,000</option>
+                            <option value="150001-250000">₦150,001 - ₦250,000</option>
+                            <option value="250001+">₦250,001 and above</option>
+                        </select>
+                        <label style="top:5px; font-size:0.7rem;">Price Range</label>
+                    </div>
+                    <div class="input-floating" style="margin:0;">
+                        <select id="guestLocationFilter" onchange="if(window.app) window.app.updateGuestFilter('location', this.value)">
+                            <option value="all" selected>All Locations</option>
+                            <option value="Katampe">Katampe</option>
+                            <option value="Jahi">Jahi</option>
+                            <option value="Gwarinpa">Gwarinpa</option>
+                            <option value="Asokoro">Asokoro</option>
+                            <option value="Maitama">Maitama</option>
+                            <option value="Wuse">Wuse</option>
+                        </select>
+                        <label style="top:5px; font-size:0.7rem;">Location</label>
+                    </div>
+                    <div class="input-floating" style="margin:0;">
+                        <select id="guestCityFilter" onchange="if(window.app) window.app.updateGuestFilter('city', this.value)">
+                            <option value="all" selected>All Cities</option>
+                            <option value="Abuja">Abuja</option>
+                        </select>
+                        <label style="top:5px; font-size:0.7rem;">City</label>
+                    </div>
+                    <div class="input-floating" style="margin:0;">
+                        <select id="guestStateFilter" onchange="if(window.app) window.app.updateGuestFilter('state', this.value)">
+                            <option value="all" selected>All States</option>
+                            <option value="FCT">FCT</option>
+                        </select>
+                        <label style="top:5px; font-size:0.7rem;">State</label>
+                    </div>
+                    <div class="input-floating" style="margin:0;">
+                        <select id="guestSortSelect" onchange="if(window.app) window.app.updateGuestSort(this.value)">
+                            <option value="default" selected>Recommended</option>
+                            <option value="priceAsc">Price: Low to High</option>
+                            <option value="priceDesc">Price: High to Low</option>
+                        </select>
+                        <label style="top:5px; font-size:0.7rem;">Sort By</label>
+                    </div>
+                </div>
+                <div style="display:flex; justify-content:flex-end; margin-top:14px;">
+                    <button class="btn-outline" style="padding:10px 18px;" onclick="if(window.app) window.app.resetGuestFilters()">
+                        <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                    </button>
                 </div>
             </div>
             <div class="panel" style="margin-bottom:30px;">

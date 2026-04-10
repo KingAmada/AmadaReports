@@ -7,6 +7,9 @@
         else header.classList.remove('header-scrolled');
     });
 
+    const SUPABASE_URL = 'https://ozodqvrjzlcjgorntazt.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96b2RxdnJqemxjamdvcm50YXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NDAxNDMsImV4cCI6MjA5MDUxNjE0M30.TC4eylpgt3jFaNYQosaAYp_l_ojVMrgtHTnce274tk0';
+
     let currentLoginMode = 'host';
     function toggleLoginType(type) {
         currentLoginMode = type;
@@ -29,12 +32,13 @@
         setTimeout(() => document.getElementById('loginModal').classList.add('show'), 10);
     }
 
-    function submitLogin() {
+    async function submitLogin() {
         closeModals();
         if(!window.appInitialized) {
             window.app = new AmadaApp();
             window.appInitialized = true;
         }
+        if (window.app?.ready) await window.app.ready;
         
         if (currentLoginMode === 'host') {
             const email = document.getElementById('loginEmail').value;
@@ -152,12 +156,13 @@
         btn.disabled = true;
 
         // Simulate network delay for realistic UX
-        setTimeout(() => {
+        setTimeout(async () => {
             closeModals();
             if(!window.appInitialized) {
                 window.app = new AmadaApp();
                 window.appInitialized = true;
             }
+            if (window.app?.ready) await window.app.ready;
             
             const name = document.getElementById('hostFullName').value;
             const email = document.getElementById('hostEmail').value;
@@ -177,7 +182,12 @@
     // --- THE ENGINE LOGIC (Refactored AmadaApp) ---
     class AmadaApp {
         constructor() {
-            this.googleScriptUrl = "https://script.google.com/macros/s/AKfycbwlmH-7bS0plCQ3hh_1ktGWOz0W1munajRrlMO5yBCD_cB-zffSYi9-02siM1rjejxONA/exec";
+            this.supabase = window.supabase?.createClient
+                ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+                : null;
+            this.syncDebounceTimer = null;
+            this.syncInFlight = null;
+            this.syncQueued = false;
             
             this.role = 'staff';
             this.pendingRole = null;
@@ -195,13 +205,15 @@
             this.managementFilter = 'all'; 
             this.sortBy = 'default';
             this.searchQuery = '';
+            this.guestFilters = { rooms: 'all', priceRange: 'all', location: 'all', city: 'all', state: 'all' };
+            this.guestSortBy = 'default';
 
             const today = new Date();
             this.dateFrom = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
             this.dateTo = new Date(today.getFullYear(), today.getMonth() + 1, 0).toISOString().split('T')[0]; 
 
             this.targets = {}; 
-            this.inventory = this.getInitialInventory();
+            this.inventory = [];
             this.transactions = []; 
             this.expenditures = []; 
             this.refunds = [];
@@ -211,7 +223,7 @@
             this.otherIncome = [];
             
             this.hosts = [];
-            this.teamMembers = this.getDefaultTeamMembers();
+            this.teamMembers = [];
             this.currentHostEmail = null;
             this.currentUser = null;
             this.guestSearchQuery = '';
@@ -230,47 +242,60 @@
             this.managementReportType = 'expenditure';
             this.chairmanReportType = 'income';
 
-            this.init();
+            this.ready = this.init();
         }
 
         async init() {
-            this.loadLocalData();
             this.setupCurrencyFormatting();
+            await this.syncFromCloud();
             this.render();
             refreshFloatingLabels();
             this.setupPinEnter();
             this.startAutoSlide();
             this.startSocialProofEngine();
-            await this.syncFromCloud();
         }
 
         startSocialProofEngine() {
-            const actions = [
-                { icon: 'fa-calendar-check', color: 'var(--success)', template: (n, l) => `<strong>${n}</strong> just booked a stay in <strong>${l}</strong>` },
-                { icon: 'fa-clock-rotate-left', color: 'var(--blue)', template: (n, l) => `<strong>${n}</strong> extended their stay in <strong>${l}</strong>` },
-                { icon: 'fa-house-circle-check', color: 'var(--primary)', template: (n, l) => `A Host just listed a new Premium Apartment in <strong>${l}</strong>` },
-                { icon: 'fa-ticket', color: 'var(--warning)', template: (n, l) => `<strong>${n}</strong> just won a 100% Refund Draw!` },
-                { icon: 'fa-fire', color: 'var(--danger)', template: (n, l) => `<strong>${n}</strong> just booked the last available unit in <strong>${l}</strong>` }
-            ];
-            
-            const names = ['Michael O.', 'Aisha K.', 'Emeka B.', 'Sarah T.', 'Chinedu A.', 'Fatima R.', 'David W.', 'Adeola O.'];
-            const locations = ['Katampe', 'Jahi', 'Gwarinpa', 'Asokoro', 'Maitama', 'Wuse'];
-            const times = ['Just now', '2 mins ago', '5 mins ago', '12 mins ago', '1 hr ago'];
+            const triggerRealProof = () => {
+                const events = [];
 
-            const triggerRandomProof = () => {
-                const action = actions[Math.floor(Math.random() * actions.length)];
-                const name = names[Math.floor(Math.random() * names.length)];
-                const loc = locations[Math.floor(Math.random() * locations.length)];
-                const time = times[Math.floor(Math.random() * times.length)];
+                this.transactions.slice(-8).forEach(tx => {
+                    const prop = this.inventory.find(item => item.id === tx.propId);
+                    if (!prop) return;
+                    events.push({
+                        icon: 'fa-calendar-check',
+                        color: 'var(--success)',
+                        textHtml: `<strong>${tx.guest || 'A guest'}</strong> booked a stay in <strong>${prop.loc}</strong>`,
+                        timeText: tx.date || 'Recently'
+                    });
+                });
 
-                this.displaySocialProof(action.icon, action.color, action.template(name, loc), time);
+                this.raffleWinners.slice(-4).forEach(entry => {
+                    events.push({
+                        icon: 'fa-ticket',
+                        color: 'var(--warning)',
+                        textHtml: `<strong>${entry.guest || entry.guestName || 'A guest'}</strong> won a refund draw`,
+                        timeText: entry.drawnAt ? String(entry.drawnAt).slice(0, 10) : 'Recently'
+                    });
+                });
 
-                // Schedule next proof randomly between 8s and 25s
-                setTimeout(triggerRandomProof, Math.floor(Math.random() * 17000) + 8000);
+                this.inventory.slice(-4).forEach(prop => {
+                    if (!prop.name || !prop.loc) return;
+                    events.push({
+                        icon: 'fa-house-circle-check',
+                        color: 'var(--primary)',
+                        textHtml: `<strong>${prop.name}</strong> is listed in <strong>${prop.loc}</strong>`,
+                        timeText: 'Live inventory'
+                    });
+                });
+
+                if (events.length === 0) return;
+                const event = events[Math.floor(Math.random() * events.length)];
+                this.displaySocialProof(event.icon, event.color, event.textHtml, event.timeText);
+                setTimeout(triggerRealProof, Math.floor(Math.random() * 17000) + 8000);
             };
 
-            // Start first proof after 3 seconds
-            setTimeout(triggerRandomProof, 3000);
+            setTimeout(triggerRealProof, 3000);
         }
 
         displaySocialProof(icon, color, textHtml, timeText) {
@@ -440,131 +465,502 @@
             }
         }
 
-        getInitialInventory() {
-            let inv = [];
-            
-            // Reusable mock image sets for slider
-            const imgsPremium = [
-                'https://images.unsplash.com/photo-1600607686527-6fb886090705?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                'https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                'https://images.unsplash.com/photo-1600585154340-be6161a56a0c?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-            ];
-            const imgsStandard = [
-                'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80',
-                'https://images.unsplash.com/photo-1505691938895-1758d7feb511?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'
-            ];
-            
-            const commonAmenities = [
-                { icon: 'fa-wifi', text: 'High-Speed WiFi' },
-                { icon: 'fa-snowflake', text: 'Air Conditioning' },
-                { icon: 'fa-tv', text: 'Smart TV & Netflix' },
-                { icon: 'fa-shield-halved', text: '24/7 Security' },
-                { icon: 'fa-bolt', text: '24/7 Power' }
-            ];
-            const premiumAmenities = [...commonAmenities, { icon: 'fa-water-ladder', text: 'Private Pool' }, { icon: 'fa-dumbbell', text: 'Gym Access' }];
+        getInitialInventory() { return []; }
 
-            // Coordinates for map markers
-            const coords = {
-                'Katampe': { lat: 9.129424, lng: 7.429680 },
-                'Jahi': { lat: 9.103536, lng: 7.425503 },
-                'Gwarinpa': { lat: 9.106198, lng: 7.377890 }
+        getDefaultTeamMembers() { return []; }
+
+        saveLocalData() {
+            this.render();
+            if(document.getElementById('guestView').style.display === 'block') this.renderGuestGrid();
+            this.scheduleRemoteSync(); 
+        }
+
+        scheduleRemoteSync() {
+            if (this.syncDebounceTimer) clearTimeout(this.syncDebounceTimer);
+            this.syncDebounceTimer = setTimeout(() => this.syncToCloud(), 150);
+        }
+
+        getSystemHostRecord() {
+            return {
+                name: 'System Admin',
+                email: 'admin@amada.com',
+                phone: '',
+                password: 'demo-admin'
             };
-
-            for(let i=1; i<=3; i++) inv.push({ id: `h_4bed_${i}`, loc: 'Katampe', name: `Premium 4 Bed Duplex ${i}`, price: 250000, type: '4-Bed Duplex', status: 'available', hostEmail: 'admin@amada.com', images: imgsPremium, amenities: premiumAmenities, coords: coords['Katampe'] });
-            for(let i=1; i<=3; i++) inv.push({ id: `h_1bed_${i}`, loc: 'Katampe', name: `Luxury 1 Bed Apt ${i}`, price: 80000, type: '1 Bed', status: 'available', hostEmail: 'admin@amada.com', images: imgsPremium, amenities: commonAmenities, coords: coords['Katampe'] });
-            for(let i=1; i<=2; i++) inv.push({ id: `j_3bed_${i}`, loc: 'Jahi', name: `Executive 3 Bed Apt ${i}`, price: 150000, type: '3 Bed', status: 'available', hostEmail: 'admin@amada.com', images: imgsStandard, amenities: premiumAmenities, coords: coords['Jahi'] });
-            for(let i=1; i<=4; i++) inv.push({ id: `j_2bed_${i}`, loc: 'Jahi', name: `Standard 2 Bed Apt ${i}`, price: 120000, type: '2 Bed', status: 'available', hostEmail: 'admin@amada.com', images: imgsStandard, amenities: commonAmenities, coords: coords['Jahi'] });
-            for(let i=1; i<=2; i++) inv.push({ id: `j_1bed_${i}`, loc: 'Jahi', name: `Standard 1 Bed Apt ${i}`, price: 70000, type: '1 Bed', status: 'available', hostEmail: 'admin@amada.com', images: imgsStandard, amenities: commonAmenities, coords: coords['Jahi'] });
-            for(let i=1; i<=3; i++) inv.push({ id: `w_studio_${i}`, loc: 'Gwarinpa', name: `Classic Studio ${i}`, price: 40000, type: 'Studio', status: 'available', hostEmail: 'admin@amada.com', images: imgsStandard, amenities: commonAmenities, coords: coords['Gwarinpa'] });
-            for(let i=1; i<=3; i++) inv.push({ id: `w_1bed_${i}`, loc: 'Gwarinpa', name: `Classic 1 Bed Apt ${i}`, price: 50000, type: '1 Bed', status: 'available', hostEmail: 'admin@amada.com', images: imgsStandard, amenities: commonAmenities, coords: coords['Gwarinpa'] });
-            
-            // Randomly occupy some units for visual realism on demo
-            inv[0].status = 'occupied'; inv[0].guestName = 'Aliko D.';
-            inv[2].status = 'occupied'; inv[2].guestName = 'Femi O.';
-            inv[5].status = 'occupied'; inv[5].guestName = 'Tony E.';
-
-            return inv;
         }
 
-        getDefaultTeamMembers() {
-            return [
-                { id: 'team_staff_demo', name: 'Operations Demo', role: 'staff', staffId: 'ops-001', email: 'ops@amada.com', pin: '1234', createdBy: 'system' },
-                { id: 'team_mgmt_demo', name: 'Management Demo', role: 'management', staffId: 'mgmt-001', email: 'management@amada.com', pin: '4444', createdBy: 'system' },
-                { id: 'team_chair_demo', name: 'Chairman Demo', role: 'chairman', staffId: 'chair-001', email: 'chairman@amada.com', pin: '8888', createdBy: 'system' }
-            ];
+        getHostsForPersistence() {
+            const hosts = [...this.hosts];
+            const needsSystemHost = this.inventory.some(item => item.hostEmail === 'admin@amada.com') ||
+                this.teamMembers.some(member => (member.createdBy || '') === 'system');
+
+            if (needsSystemHost && !hosts.some(host => host.email === 'admin@amada.com')) {
+                hosts.push(this.getSystemHostRecord());
+            }
+            return hosts;
         }
 
-        loadLocalData() {
-            const keys = ['amadaInventory', 'amadaTransactions', 'amadaExpenditures', 'amadaTargets', 'amadaRefunds', 'amadaRaffleWinners', 'amadaHosts', 'amadaTeamMembers', 'amadaSalaryRegistry', 'amadaRentRegistry', 'amadaOtherIncome'];
-            keys.forEach(k => {
-                const val = localStorage.getItem(k);
-                if(val) this[k.replace('amada', '').toLowerCase()] = JSON.parse(val);
-            });
-            if (!Array.isArray(this.teamMembers) || this.teamMembers.length === 0) {
-                this.teamMembers = this.getDefaultTeamMembers();
+        async fetchAllRows(table) {
+            const { data, error } = await this.supabase.from(table).select('*');
+            if (error) throw error;
+            return data || [];
+        }
+
+        async syncTableById(table, rows) {
+            const { data: existingRows, error: selectError } = await this.supabase.from(table).select('id');
+            if (selectError) throw selectError;
+
+            if (rows.length > 0) {
+                const { error: upsertError } = await this.supabase.from(table).upsert(rows, { onConflict: 'id' });
+                if (upsertError) throw upsertError;
+            }
+
+            const nextIds = new Set(rows.map(row => row.id));
+            const idsToDelete = (existingRows || []).map(row => row.id).filter(id => !nextIds.has(id));
+            if (idsToDelete.length > 0) {
+                const { error: deleteError } = await this.supabase.from(table).delete().in('id', idsToDelete);
+                if (deleteError) throw deleteError;
             }
         }
 
-        saveLocalData() {
-            localStorage.setItem('amadaInventory', JSON.stringify(this.inventory));
-            localStorage.setItem('amadaTransactions', JSON.stringify(this.transactions));
-            localStorage.setItem('amadaExpenditures', JSON.stringify(this.expenditures));
-            localStorage.setItem('amadaTargets', JSON.stringify(this.targets));
-            localStorage.setItem('amadaRefunds', JSON.stringify(this.refunds));
-            localStorage.setItem('amadaRaffleWinners', JSON.stringify(this.raffleWinners));
-            localStorage.setItem('amadaHosts', JSON.stringify(this.hosts));
-            localStorage.setItem('amadaTeamMembers', JSON.stringify(this.teamMembers));
-            localStorage.setItem('amadaSalaryRegistry', JSON.stringify(this.salaryRegistry));
-            localStorage.setItem('amadaRentRegistry', JSON.stringify(this.rentRegistry));
-            localStorage.setItem('amadaOtherIncome', JSON.stringify(this.otherIncome));
-            this.render();
-            if(document.getElementById('guestView').style.display === 'block') this.renderGuestGrid();
-            this.syncToCloud(); 
+        async syncHostsTable(hostRows) {
+            const { data: existingHosts, error: selectError } = await this.supabase.from('hosts').select('email');
+            if (selectError) throw selectError;
+
+            if (hostRows.length > 0) {
+                const { error: upsertError } = await this.supabase.from('hosts').upsert(hostRows, { onConflict: 'email' });
+                if (upsertError) throw upsertError;
+            }
+
+            const nextEmails = new Set(hostRows.map(row => row.email));
+            const emailsToDelete = (existingHosts || []).map(row => row.email).filter(email => !nextEmails.has(email));
+            if (emailsToDelete.length > 0) {
+                const { error: deleteError } = await this.supabase.from('hosts').delete().in('email', emailsToDelete);
+                if (deleteError) throw deleteError;
+            }
+
+            const { data: hosts, error: refreshError } = await this.supabase.from('hosts').select('id, email');
+            if (refreshError) throw refreshError;
+            return hosts || [];
+        }
+
+        async syncTeamMembersTable(memberRows) {
+            const { data: existingRows, error: selectError } = await this.supabase.from('team_members').select('staff_id');
+            if (selectError) throw selectError;
+
+            if (memberRows.length > 0) {
+                const { error: upsertError } = await this.supabase.from('team_members').upsert(memberRows, { onConflict: 'staff_id' });
+                if (upsertError) throw upsertError;
+            }
+
+            const nextKeys = new Set(memberRows.map(row => row.staff_id));
+            const keysToDelete = (existingRows || []).map(row => row.staff_id).filter(staffId => !nextKeys.has(staffId));
+            if (keysToDelete.length > 0) {
+                const { error: deleteError } = await this.supabase.from('team_members').delete().in('staff_id', keysToDelete);
+                if (deleteError) throw deleteError;
+            }
+        }
+
+        async syncRevenueTargetsTable(rows) {
+            const { data: existingRows, error: selectError } = await this.supabase.from('revenue_targets').select('id, location, target_month');
+            if (selectError) throw selectError;
+
+            if (rows.length > 0) {
+                const { error: upsertError } = await this.supabase.from('revenue_targets').upsert(rows, { onConflict: 'location,target_month' });
+                if (upsertError) throw upsertError;
+            }
+
+            const nextKeys = new Set(rows.map(row => `${row.location}::${row.target_month}`));
+            const idsToDelete = (existingRows || [])
+                .filter(row => !nextKeys.has(`${row.location}::${row.target_month}`))
+                .map(row => row.id);
+
+            if (idsToDelete.length > 0) {
+                const { error: deleteError } = await this.supabase.from('revenue_targets').delete().in('id', idsToDelete);
+                if (deleteError) throw deleteError;
+            }
+        }
+
+        mapHostToRow(host) {
+            return {
+                full_name: host.name,
+                email: host.email,
+                phone: host.phone || null,
+                password: host.password
+            };
+        }
+
+        mapPropertyToRow(property, hostIdByEmail) {
+            const hostId = hostIdByEmail.get(property.hostEmail || 'admin@amada.com');
+            if (!hostId) return null;
+
+            return {
+                id: property.id,
+                host_id: hostId,
+                property_name: property.name,
+                location: property.loc,
+                property_type: property.type,
+                nightly_price: Number(property.price) || 0,
+                status: property.status || 'available',
+                guest_name: property.guestName || null,
+                access_code: property.accessCode || null,
+                coords: property.coords || {},
+                images: Array.isArray(property.images) ? property.images : [],
+                amenities: this.normalizeAmenities(property.amenities)
+            };
+        }
+
+        mapBookingToRow(transaction) {
+            return {
+                id: transaction.id || this.getTransactionId(transaction),
+                property_id: transaction.propId,
+                booking_date: transaction.date || new Date().toISOString().split('T')[0],
+                guest_name: transaction.guest,
+                guest_phone: transaction.phone,
+                guest_email: transaction.email || null,
+                access_code: transaction.accessCode || null,
+                check_in: transaction.checkIn || null,
+                check_out: transaction.checkOut || null,
+                amount_paid: Number(transaction.amount) || 0,
+                estimated_total: Number(transaction.estimatedTotal) || 0,
+                caution_fee_paid: Number(transaction.cautionFee) || 0
+            };
+        }
+
+        mapExpenditureToRow(expense, memberIdByStaffId) {
+            return {
+                id: expense.id,
+                title: expense.title,
+                amount: Number(expense.amount) || 0,
+                category: expense.category,
+                scope: expense.scope,
+                expense_date: expense.date,
+                details: expense.details,
+                requested_by_name: expense.requestedBy,
+                requested_by_staff_id: expense.staffId || null,
+                requested_by_pin: expense.pin || null,
+                requested_by_member_id: memberIdByStaffId.get(expense.staffId) || null,
+                approver_name: expense.approver || null,
+                approver_staff_id: expense.approverStaffId || null,
+                approver_pin: expense.approverPin || null,
+                approved_by_member_id: memberIdByStaffId.get(expense.approverStaffId) || null,
+                status: expense.status || 'Pending approval',
+                approved_at: expense.approvedAt || null
+            };
+        }
+
+        mapRefundToRow(refund, memberIdByStaffId) {
+            return {
+                id: refund.id,
+                booking_id: refund.transactionId,
+                property_id: refund.propId || null,
+                property_name: refund.propertyName || null,
+                guest_name: refund.guest,
+                amount: Number(refund.amount) || 0,
+                reason: refund.reason,
+                processed_by_name: refund.processedBy,
+                processed_by_staff_id: refund.processedById || null,
+                processed_by_pin: refund.pin || null,
+                processed_by_member_id: memberIdByStaffId.get(refund.processedById) || null,
+                refund_date: refund.date
+            };
+        }
+
+        mapSalaryToRow(entry, memberIdByEmail) {
+            return {
+                id: entry.id,
+                staff_name: entry.staffName,
+                position: entry.role,
+                location: entry.location,
+                amount: Number(entry.amount) || 0,
+                phone: entry.phone || null,
+                email: entry.email || null,
+                team_member_id: entry.email ? (memberIdByEmail.get(entry.email.toLowerCase()) || null) : null
+            };
+        }
+
+        mapRentToRow(entry) {
+            return {
+                id: entry.id,
+                location: entry.location,
+                amount: Number(entry.amount) || 0
+            };
+        }
+
+        mapOtherIncomeToRow(entry, memberIdByStaffId) {
+            return {
+                id: entry.id,
+                income_source: entry.category,
+                amount: Number(entry.amount) || 0,
+                location: entry.location,
+                income_date: entry.date,
+                details: entry.details || null,
+                guest_name: entry.guest || null,
+                recorded_by_name: entry.recordedBy,
+                recorded_by_staff_id: entry.recordedByStaffId || null,
+                recorded_by_member_id: memberIdByStaffId.get(entry.recordedByStaffId) || null
+            };
+        }
+
+        mapTargetToRow(key, amount, memberIdByStaffId) {
+            const [location, month] = key.split('_');
+            return {
+                location,
+                target_month: `${month}-01`,
+                amount: Number(amount) || 0,
+                created_by_member_id: memberIdByStaffId.get(this.currentUser?.id) || null
+            };
+        }
+
+        mapRaffleToRow(entry) {
+            return {
+                id: entry.id || crypto.randomUUID(),
+                guest_name: entry.guest || entry.guestName || 'Guest',
+                prize: entry.prize || 'Raffle Reward',
+                amount: entry.amount || null,
+                booking_id: entry.transactionId || null,
+                drawn_at: entry.date || entry.drawnAt || new Date().toISOString()
+            };
         }
 
         async syncFromCloud() {
+            if (!this.supabase) {
+                this.updateSyncUI('offline');
+                console.warn('Supabase client not available. Running without remote persistence.');
+                return;
+            }
+
             this.updateSyncUI('syncing');
             try {
-                const res = await fetch(this.googleScriptUrl);
-                if (!res.ok) throw new Error(`Server Error (${res.status})`);
-                const data = await res.json();
-                if (data.status === 'error') throw new Error(data.message);
+                const hostsRows = await this.fetchAllRows('hosts');
+                const hostEmailById = new Map(hostsRows.map(row => [row.id, row.email]));
+                this.hosts = hostsRows
+                    .map(row => ({
+                        name: row.full_name,
+                        email: row.email,
+                        phone: row.phone || '',
+                        password: row.password
+                    }))
+                    .filter(host => host.email !== 'admin@amada.com');
 
-                if (data.inventory?.length > 0) this.inventory = data.inventory;
-                if (data.transactions) this.transactions = data.transactions;
-                if (data.expenditures) this.expenditures = data.expenditures;
-                if (data.targets) this.targets = data.targets;
-                if (data.refunds) this.refunds = data.refunds;
-                if (data.raffleWinners) this.raffleWinners = data.raffleWinners;
-                if (data.salaryRegistry) this.salaryRegistry = data.salaryRegistry;
-                if (data.rentRegistry) this.rentRegistry = data.rentRegistry;
-                if (data.otherIncome) this.otherIncome = data.otherIncome;
-                
+                const [
+                    teamRows,
+                    propertyRows,
+                    bookingRows,
+                    expenditureRows,
+                    refundRows,
+                    salaryRows,
+                    rentRows,
+                    otherIncomeRows,
+                    targetRows,
+                    raffleRows
+                ] = await Promise.all([
+                    this.fetchAllRows('team_members'),
+                    this.fetchAllRows('properties'),
+                    this.fetchAllRows('bookings'),
+                    this.fetchAllRows('expenditure_requests'),
+                    this.fetchAllRows('refunds'),
+                    this.fetchAllRows('salary_registry'),
+                    this.fetchAllRows('rent_registry'),
+                    this.fetchAllRows('other_income_entries'),
+                    this.fetchAllRows('revenue_targets'),
+                    this.fetchAllRows('raffle_winners')
+                ]);
+
+                this.teamMembers = teamRows.map(row => ({
+                    id: row.id,
+                    name: row.full_name,
+                    role: row.role,
+                    staffId: row.staff_id,
+                    email: row.email || '',
+                    phone: row.phone || '',
+                    pin: row.pin,
+                    createdBy: hostEmailById.get(row.host_id) || 'admin@amada.com'
+                }));
+
+                if (propertyRows.length > 0) {
+                    this.inventory = propertyRows.map(row => ({
+                        id: row.id,
+                        loc: row.location,
+                        name: row.property_name,
+                        price: Number(row.nightly_price) || 0,
+                        type: row.property_type,
+                        status: row.status || 'available',
+                        hostEmail: hostEmailById.get(row.host_id) || 'admin@amada.com',
+                        guestName: row.guest_name || null,
+                        accessCode: row.access_code || null,
+                        images: Array.isArray(row.images) ? row.images : [],
+                        amenities: this.normalizeAmenities(row.amenities),
+                        coords: row.coords || {}
+                    }));
+                }
+
+                this.transactions = bookingRows.map(row => ({
+                    id: row.id,
+                    date: row.booking_date,
+                    propId: row.property_id,
+                    amount: Number(row.amount_paid) || 0,
+                    estimatedTotal: Number(row.estimated_total) || 0,
+                    cautionFee: Number(row.caution_fee_paid) || 0,
+                    guest: row.guest_name,
+                    phone: row.guest_phone,
+                    email: row.guest_email || '',
+                    accessCode: row.access_code || '',
+                    checkIn: row.check_in || '',
+                    checkOut: row.check_out || ''
+                }));
+
+                this.expenditures = expenditureRows.map(row => ({
+                    id: row.id,
+                    title: row.title,
+                    amount: Number(row.amount) || 0,
+                    category: row.category,
+                    scope: row.scope,
+                    date: row.expense_date,
+                    details: row.details,
+                    requestedBy: row.requested_by_name,
+                    staffId: row.requested_by_staff_id || '',
+                    pin: row.requested_by_pin || '',
+                    approver: row.approver_name || '',
+                    approverStaffId: row.approver_staff_id || '',
+                    approverPin: row.approver_pin || '',
+                    status: row.status,
+                    approvedAt: row.approved_at || null,
+                    createdAt: row.created_at
+                }));
+
+                this.refunds = refundRows.map(row => ({
+                    id: row.id,
+                    transactionId: row.booking_id,
+                    propId: row.property_id || '',
+                    propertyName: row.property_name || '',
+                    guest: row.guest_name,
+                    amount: Number(row.amount) || 0,
+                    reason: row.reason,
+                    processedBy: row.processed_by_name,
+                    processedById: row.processed_by_staff_id || '',
+                    pin: row.processed_by_pin || '',
+                    date: row.refund_date
+                }));
+
+                this.salaryRegistry = salaryRows.map(row => ({
+                    id: row.id,
+                    staffName: row.staff_name,
+                    role: row.position,
+                    location: row.location,
+                    amount: Number(row.amount) || 0,
+                    phone: row.phone || '',
+                    email: row.email || ''
+                }));
+
+                this.rentRegistry = rentRows.map(row => ({
+                    id: row.id,
+                    location: row.location,
+                    amount: Number(row.amount) || 0
+                }));
+
+                this.otherIncome = otherIncomeRows.map(row => ({
+                    id: row.id,
+                    category: row.income_source,
+                    amount: Number(row.amount) || 0,
+                    location: row.location,
+                    date: row.income_date,
+                    details: row.details || '',
+                    guest: row.guest_name || '',
+                    recordedBy: row.recorded_by_name,
+                    recordedByStaffId: row.recorded_by_staff_id || ''
+                }));
+
+                this.targets = Object.fromEntries(targetRows.map(row => [
+                    `${row.location}_${String(row.target_month).slice(0, 7)}`,
+                    Number(row.amount) || 0
+                ]));
+
+                this.raffleWinners = raffleRows.map(row => ({
+                    id: row.id,
+                    guest: row.guest_name,
+                    prize: row.prize,
+                    amount: row.amount || 0,
+                    transactionId: row.booking_id || '',
+                    drawnAt: row.drawn_at
+                }));
+
                 this.updateSyncUI('online');
             } catch (e) { 
                 this.updateSyncUI('offline');
-                console.warn("Using local cache. Cloud Sync Failed:", e);
+                console.warn("Supabase sync failed:", e);
             }
         }
 
         async syncToCloud() {
+            if (!this.supabase) {
+                this.updateSyncUI('offline');
+                return;
+            }
+
+            if (this.syncInFlight) {
+                this.syncQueued = true;
+                return this.syncInFlight;
+            }
+
+            this.syncInFlight = this.performSupabaseSync().finally(() => {
+                this.syncInFlight = null;
+                if (this.syncQueued) {
+                    this.syncQueued = false;
+                    this.syncToCloud();
+                }
+            });
+
+            return this.syncInFlight;
+        }
+
+        async performSupabaseSync() {
             this.updateSyncUI('syncing');
-            const payload = { 
-                inventory: this.inventory, transactions: this.transactions, 
-                expenditures: this.expenditures, targets: this.targets, refunds: this.refunds,
-                raffleWinners: this.raffleWinners, salaryRegistry: this.salaryRegistry,
-                rentRegistry: this.rentRegistry, otherIncome: this.otherIncome
-            };
             try {
-                const res = await fetch(this.googleScriptUrl, { method: 'POST', body: JSON.stringify(payload) });
-                if (!res.ok) throw new Error(`Server Error (${res.status})`);
-                const json = await res.json();
-                if (json.status === 'success') this.updateSyncUI('online');
-                else throw new Error(json.message || "Unknown error");
+                const hostRows = this.getHostsForPersistence().map(host => this.mapHostToRow(host));
+                const syncedHosts = await this.syncHostsTable(hostRows);
+                const hostIdByEmail = new Map(syncedHosts.map(row => [row.email, row.id]));
+
+                const memberRows = this.teamMembers
+                    .map(member => {
+                        const createdByEmail = member.createdBy === 'system' ? 'admin@amada.com' : (member.createdBy || this.currentHostEmail || 'admin@amada.com');
+                        const hostId = hostIdByEmail.get(createdByEmail);
+                        if (!hostId) return null;
+                        return {
+                            host_id: hostId,
+                            full_name: member.name,
+                            role: member.role,
+                            staff_id: member.staffId,
+                            email: member.email || null,
+                            phone: member.phone || null,
+                            pin: member.pin,
+                            is_active: true
+                        };
+                    })
+                    .filter(Boolean);
+
+                await this.syncTeamMembersTable(memberRows);
+
+                const memberLookupRows = await this.fetchAllRows('team_members');
+                const memberIdByStaffId = new Map(memberLookupRows.map(row => [row.staff_id, row.id]));
+                const memberIdByEmail = new Map(memberLookupRows.filter(row => row.email).map(row => [String(row.email).toLowerCase(), row.id]));
+
+                await this.syncTableById('properties', this.inventory.map(item => this.mapPropertyToRow(item, hostIdByEmail)).filter(Boolean));
+                await this.syncTableById('bookings', this.transactions.map(item => this.mapBookingToRow(item)));
+                await this.syncTableById('expenditure_requests', this.expenditures.map(item => this.mapExpenditureToRow(item, memberIdByStaffId)));
+                await this.syncTableById('refunds', this.refunds.map(item => this.mapRefundToRow(item, memberIdByStaffId)));
+                await this.syncTableById('salary_registry', this.salaryRegistry.map(item => this.mapSalaryToRow(item, memberIdByEmail)));
+                await this.syncTableById('rent_registry', this.rentRegistry.map(item => this.mapRentToRow(item)));
+                await this.syncTableById('other_income_entries', this.otherIncome.map(item => this.mapOtherIncomeToRow(item, memberIdByStaffId)));
+                await this.syncRevenueTargetsTable(
+                    Object.entries(this.targets).map(([key, amount]) => this.mapTargetToRow(key, amount, memberIdByStaffId))
+                );
+                await this.syncTableById('raffle_winners', this.raffleWinners.map(item => this.mapRaffleToRow(item)));
+
+                this.updateSyncUI('online');
             } catch (e) { 
                 this.updateSyncUI('offline');
-                console.warn(`Data Save Sync Failed: ${e.message}`);
+                console.warn(`Supabase save failed: ${e.message}`);
             }
         }
 
@@ -574,16 +970,24 @@
 
             const roleToggle = document.getElementById('staffRoleToggle');
             const hostBtn = document.getElementById('btnHost');
+            const staffBtn = document.getElementById('btnStaff');
+            const mgmtBtn = document.getElementById('btnMgmt');
+            const chairBtn = document.getElementById('btnChair');
             if (roleToggle) roleToggle.style.display = 'flex';
             if (hostBtn) hostBtn.style.display = this.role === 'host' ? 'inline-flex' : 'none';
+
+            const signedInRole = this.role === 'host' ? 'host' : (this.currentUser?.role || this.role);
+            if (staffBtn) staffBtn.style.display = (signedInRole === 'host' || signedInRole === 'staff' || signedInRole === 'management' || signedInRole === 'chairman') ? 'inline-flex' : 'none';
+            if (mgmtBtn) mgmtBtn.style.display = (signedInRole === 'host' || signedInRole === 'management' || signedInRole === 'chairman') ? 'inline-flex' : 'none';
+            if (chairBtn) chairBtn.style.display = (signedInRole === 'host' || signedInRole === 'chairman') ? 'inline-flex' : 'none';
 
             // Buttons UI state
             document.querySelectorAll('.role-btn').forEach(b => b.classList.remove('active'));
             const effectiveRole = this.role === 'host' ? this.hostDashboardRole : this.role;
             if(effectiveRole === 'host' && hostBtn) hostBtn.classList.add('active');
-            if(effectiveRole === 'staff') document.getElementById('btnStaff').classList.add('active');
-            if(effectiveRole === 'management') document.getElementById('btnMgmt').classList.add('active');
-            if(effectiveRole === 'chairman') document.getElementById('btnChair').classList.add('active');
+            if(effectiveRole === 'staff' && staffBtn) staffBtn.classList.add('active');
+            if(effectiveRole === 'management' && mgmtBtn) mgmtBtn.classList.add('active');
+            if(effectiveRole === 'chairman' && chairBtn) chairBtn.classList.add('active');
 
             if (effectiveRole === 'host') this.renderHostDashboard(container);
             else if (effectiveRole === 'chairman') this.renderChairmanDashboard(container);
@@ -1032,7 +1436,7 @@
             // 3. Save to System
             this.inventory.push({
                 id: `host_${Date.now()}`, loc: loc, name: name, price: price, type: type, status: 'available', hostEmail: this.currentHostEmail,
-                images: processedImages, amenities: selectedAmenities, coords: { lat, lng }
+                images: processedImages, amenities: selectedAmenities, coords: { lat, lng }, city: 'Abuja', state: 'FCT'
             });
             
             this.saveLocalData();
@@ -1105,6 +1509,8 @@
                 lng: parseFloat(document.getElementById('editPropLng').value)
             };
             this.inventory[propIndex].amenities = selectedAmenities;
+            this.inventory[propIndex].city = this.inventory[propIndex].city || 'Abuja';
+            this.inventory[propIndex].state = this.inventory[propIndex].state || 'FCT';
 
             const fileInput = document.getElementById('editPropImages');
             if (fileInput.files && fileInput.files.length > 0) {
@@ -1146,6 +1552,108 @@
             if (this.guestViewMode === 'map') {
                 this.initGuestMap();
             }
+        }
+
+        updateGuestFilter(key, value) {
+            this.guestFilters[key] = value;
+            this.renderGuestGrid();
+            if (this.guestViewMode === 'map') this.initGuestMap();
+        }
+
+        updateGuestSort(value) {
+            this.guestSortBy = value;
+            this.renderGuestGrid();
+            if (this.guestViewMode === 'map') this.initGuestMap();
+        }
+
+        resetGuestFilters() {
+            this.guestFilters = { rooms: 'all', priceRange: 'all', location: 'all', city: 'all', state: 'all' };
+            this.guestSortBy = 'default';
+            this.guestSearchQuery = '';
+
+            const searchInput = document.querySelector('#guestView input[onkeyup*="updateGuestSearch"]');
+            if (searchInput) searchInput.value = '';
+            const setValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            };
+            setValue('guestRoomsFilter', 'all');
+            setValue('guestPriceRangeFilter', 'all');
+            setValue('guestLocationFilter', 'all');
+            setValue('guestCityFilter', 'all');
+            setValue('guestStateFilter', 'all');
+            setValue('guestSortSelect', 'default');
+
+            refreshFloatingLabels(document.getElementById('guestView'));
+            this.renderGuestGrid();
+            if (this.guestViewMode === 'map') this.initGuestMap();
+        }
+
+        getPropertyCity(prop) {
+            return prop.city || 'Abuja';
+        }
+
+        getPropertyState(prop) {
+            return prop.state || 'FCT';
+        }
+
+        getPropertyRoomCount(prop) {
+            const type = String(prop.type || '').toLowerCase();
+            if (type.includes('studio')) return 0;
+            const match = type.match(/(\d+)/);
+            return match ? parseInt(match[1], 10) : 1;
+        }
+
+        getFilteredGuestProperties() {
+            let data = this.inventory.filter(i => i.status === 'available');
+
+            if (this.guestSearchQuery) {
+                const q = this.guestSearchQuery.toLowerCase();
+                data = data.filter(i =>
+                    i.name.toLowerCase().includes(q) ||
+                    i.loc.toLowerCase().includes(q) ||
+                    this.getPropertyCity(i).toLowerCase().includes(q) ||
+                    this.getPropertyState(i).toLowerCase().includes(q)
+                );
+            }
+
+            if (this.guestFilters.location !== 'all') {
+                data = data.filter(i => i.loc === this.guestFilters.location);
+            }
+
+            if (this.guestFilters.city !== 'all') {
+                data = data.filter(i => this.getPropertyCity(i) === this.guestFilters.city);
+            }
+
+            if (this.guestFilters.state !== 'all') {
+                data = data.filter(i => this.getPropertyState(i) === this.guestFilters.state);
+            }
+
+            if (this.guestFilters.rooms !== 'all') {
+                const selectedRooms = parseInt(this.guestFilters.rooms, 10);
+                data = data.filter(i => {
+                    const rooms = this.getPropertyRoomCount(i);
+                    return selectedRooms >= 4 ? rooms >= 4 : rooms === selectedRooms;
+                });
+            }
+
+            if (this.guestFilters.priceRange !== 'all') {
+                data = data.filter(i => {
+                    const price = Number(i.price) || 0;
+                    const range = this.guestFilters.priceRange;
+                    if (range === '250001+') return price >= 250001;
+                    const [min, max] = range.split('-').map(Number);
+                    return price >= min && price <= max;
+                });
+            }
+
+            if (this.guestSortBy === 'priceAsc') {
+                data = [...data].sort((a, b) => (Number(a.price) || 0) - (Number(b.price) || 0));
+            } else if (this.guestSortBy === 'priceDesc') {
+                data = [...data].sort((a, b) => (Number(b.price) || 0) - (Number(a.price) || 0));
+            }
+
+            return data;
         }
 
         toggleGuestView(mode) {
@@ -1190,12 +1698,7 @@
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
             });
 
-            // Filter available properties
-            let data = this.inventory.filter(i => i.status === 'available');
-            if(this.guestSearchQuery) {
-                const q = this.guestSearchQuery.toLowerCase();
-                data = data.filter(i => i.name.toLowerCase().includes(q) || i.loc.toLowerCase().includes(q));
-            }
+            let data = this.getFilteredGuestProperties();
 
             // Group by coordinates with a slight offset to prevent overlapping markers
             data.forEach(p => {
@@ -1222,13 +1725,7 @@
             const targetDiv = document.getElementById('guestGridArea');
             if(!targetDiv) return;
             
-            // Only show available properties to guests
-            let data = this.inventory.filter(i => i.status === 'available');
-            
-            if(this.guestSearchQuery) {
-                const q = this.guestSearchQuery.toLowerCase();
-                data = data.filter(i => i.name.toLowerCase().includes(q) || i.loc.toLowerCase().includes(q));
-            }
+            let data = this.getFilteredGuestProperties();
             
             targetDiv.innerHTML = '';
             if(data.length === 0) {
@@ -1278,7 +1775,7 @@
         }
 
         renderFilteredGrid(targetDiv) {
-            let data = this.inventory;
+            let data = this.getScopedInventoryRecords();
             if(this.searchQuery) {
                 const q = this.searchQuery.toLowerCase();
                 data = data.filter(i => i.name.toLowerCase().includes(q) || i.loc.toLowerCase().includes(q) || (i.guestName && i.guestName.toLowerCase().includes(q)));
@@ -1420,8 +1917,16 @@
                 bookBtn.style.background = 'var(--primary)';
                 bookBtn.innerHTML = isGuestMode ? '<i class="fa-solid fa-calendar-check"></i> Book This Stay' : '<i class="fa-solid fa-key"></i> Book & Gen Code';
                 bookBtn.onclick = () => {
-                    this.closeModal();
-                    this.openBookingModal(isGuestMode ? 'guest' : 'staff', prop.id);
+                    const detailsModal = document.getElementById('propDetailsModal');
+                    if (detailsModal) {
+                        detailsModal.classList.remove('show');
+                        setTimeout(() => {
+                            detailsModal.style.display = 'none';
+                            this.openBookingModal(isGuestMode ? 'guest' : 'staff', prop.id);
+                        }, 300);
+                    } else {
+                        this.openBookingModal(isGuestMode ? 'guest' : 'staff', prop.id);
+                    }
                 };
             }
 
@@ -1903,9 +2408,7 @@
 
         renderManagementPropertyTab() {
             const locations = this.getAvailableLocations();
-            const properties = this.managementLocation === 'all'
-                ? this.inventory
-                : this.inventory.filter(item => item.loc === this.managementLocation);
+            const properties = this.getFilteredInventory(this.managementLocation);
 
             return `
                 <div class="panel" style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap;">
@@ -1963,7 +2466,10 @@
         }
 
         renderStaffExpenseTab() {
-            const myRecentRequests = this.expenditures.slice().sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || '')).slice(0, 5);
+            const myRecentRequests = this.getFilteredExpenditures('', '', 'all')
+                .slice()
+                .sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || ''))
+                .slice(0, 5);
             const locations = this.getAvailableLocations();
             const actorName = this.currentUser?.name || 'Current Staff';
             const actorId = this.currentUser?.id || '';
@@ -2033,7 +2539,12 @@
 
         renderStaffIncomeTab() {
             const locations = this.getAvailableLocations();
-            const recentIncome = this.otherIncome.slice().sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 6);
+            const scopedLocations = this.getScopedLocationsSet();
+            const recentIncome = this.otherIncome
+                .filter(entry => !this.isHostDelegatedView() || scopedLocations.has(entry.location) || entry.recordedByStaffId === this.currentHostEmail)
+                .slice()
+                .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+                .slice(0, 6);
             const actorName = this.currentUser?.name || 'Current Staff';
 
             return `
@@ -2092,7 +2603,7 @@
         }
 
         getAvailableLocations() {
-            return [...new Set(this.inventory.map(item => item.loc))].sort();
+            return [...new Set(this.getScopedInventoryRecords().map(item => item.loc))].sort();
         }
 
         isDateInRange(dateValue, from, to) {
@@ -2102,9 +2613,28 @@
             return true;
         }
 
+        isHostDelegatedView() {
+            return this.role === 'host' && this.hostDashboardRole !== 'host';
+        }
+
+        getScopedInventoryRecords() {
+            if (!this.isHostDelegatedView()) return this.inventory;
+            return this.inventory.filter(item => item.hostEmail === this.currentHostEmail);
+        }
+
+        getScopedPropertyIds() {
+            return new Set(this.getScopedInventoryRecords().map(item => item.id));
+        }
+
+        getScopedLocationsSet() {
+            return new Set(this.getScopedInventoryRecords().map(item => item.loc));
+        }
+
         getFilteredTransactions(from, to, location) {
+            const scopedPropertyIds = this.getScopedPropertyIds();
             return this.transactions.filter(tx => {
                 if (!this.isDateInRange(tx.date, from, to)) return false;
+                if (this.isHostDelegatedView() && !scopedPropertyIds.has(tx.propId)) return false;
                 if (location === 'all') return true;
                 const prop = this.inventory.find(item => item.id === tx.propId);
                 return prop?.loc === location;
@@ -2116,16 +2646,24 @@
         }
 
         getFilteredExpenditures(from, to, location) {
+            const scopedLocations = this.getScopedLocationsSet();
             return this.expenditures.filter(exp => {
                 if (!this.isDateInRange(exp.date, from, to)) return false;
+                if (this.isHostDelegatedView()) {
+                    const inOwnedLocation = scopedLocations.has(exp.scope);
+                    const ownedByHost = exp.staffId === this.currentHostEmail || exp.approverStaffId === this.currentHostEmail;
+                    if (!inOwnedLocation && !ownedByHost) return false;
+                }
                 if (location === 'all') return true;
                 return (exp.scope || '').toLowerCase() === location.toLowerCase();
             });
         }
 
         getFilteredRefunds(from, to, location) {
+            const scopedPropertyIds = this.getScopedPropertyIds();
             return this.refunds.filter(refund => {
                 if (!this.isDateInRange(refund.date, from, to)) return false;
+                if (this.isHostDelegatedView() && !scopedPropertyIds.has(refund.propId)) return false;
                 if (location === 'all') return true;
                 const prop = this.inventory.find(item => item.id === refund.propId);
                 return prop?.loc === location;
@@ -2165,7 +2703,7 @@
         }
 
         getFilteredInventory(location) {
-            return this.inventory.filter(item => location === 'all' || item.loc === location);
+            return this.getScopedInventoryRecords().filter(item => location === 'all' || item.loc === location);
         }
 
         getLocationForExpense(expense) {
@@ -2175,15 +2713,19 @@
         }
 
         getBaselineTotals(location, from, to) {
+            const scopedLocations = this.getScopedLocationsSet();
             const salaries = this.salaryRegistry
+                .filter(entry => !this.isHostDelegatedView() || scopedLocations.has(entry.location))
                 .filter(entry => location === 'all' || entry.location === location)
                 .reduce((sum, entry) => sum + (entry.amount || 0), 0);
             const rent = this.rentRegistry
+                .filter(entry => !this.isHostDelegatedView() || scopedLocations.has(entry.location))
                 .filter(entry => location === 'all' || entry.location === location)
                 .reduce((sum, entry) => sum + (entry.amount || 0), 0);
             const sundry = this.expenditures
                 .filter(entry => entry.status === 'Approved for chairman')
                 .filter(entry => this.isDateInRange(entry.approvedAt || entry.date, from, to))
+                .filter(entry => !this.isHostDelegatedView() || scopedLocations.has(entry.scope) || entry.staffId === this.currentHostEmail || entry.approverStaffId === this.currentHostEmail)
                 .filter(entry => location === 'all' || entry.scope === location)
                 .reduce((sum, entry) => sum + (entry.amount || 0), 0);
             return { salary: salaries, sundry, rent };
@@ -2195,8 +2737,10 @@
             const units = this.getFilteredInventory(location);
             const occupiedUnits = units.filter(item => item.status === 'occupied').length;
             const baselines = this.getBaselineTotals(location, from, to);
+            const scopedLocations = this.getScopedLocationsSet();
             const otherIncome = this.otherIncome
                 .filter(entry => this.isDateInRange(entry.date, from, to))
+                .filter(entry => !this.isHostDelegatedView() || scopedLocations.has(entry.location) || entry.recordedByStaffId === this.currentHostEmail)
                 .filter(entry => location === 'all' || entry.location === location)
                 .reduce((sum, entry) => sum + (entry.amount || 0), 0);
 
@@ -2309,7 +2853,8 @@
                 return;
             }
 
-            if (expense.staffId === approverStaffId) {
+            const isHostSelfApproval = this.role === 'host';
+            if (!isHostSelfApproval && expense.staffId === approverStaffId) {
                 this.showNotification("A different staff member must approve this expenditure.", "error");
                 return;
             }
@@ -2761,7 +3306,7 @@
                 .slice()
                 .sort((a, b) => ((b.approvedAt || b.date || '')).localeCompare(a.approvedAt || a.date || ''))
                 .slice(0, 5);
-            const pendingExpenses = this.expenditures
+            const pendingExpenses = this.getFilteredExpenditures(this.managementDateFrom, this.managementDateTo, this.managementLocation)
                 .filter(exp => exp.status !== 'Approved for chairman')
                 .sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || ''));
             const unpaidTransactions = metrics.txs
@@ -2891,7 +3436,7 @@
                     ` : this.activeMgmtTab === 'ops' ? `
                         <div class="panel">
                             <h3 style="margin-top:0; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-money-check-dollar" style="color:var(--primary)"></i> Expenditure Approval Queue</h3>
-                            <p style="color:var(--gray); margin:6px 0 18px 0;">A different staff member must approve each expenditure before it reaches the chairman table.</p>
+                            <p style="color:var(--gray); margin:6px 0 18px 0;">Management users need a different approver, while the host owner can approve directly before it reaches the chairman table.</p>
                             ${pendingExpenses.length === 0 ? `<div style="padding:24px 0; color:var(--gray);">No pending expenditure requests right now.</div>` : pendingExpenses.map(exp => `
                                 <div style="border:1px solid #eee; border-radius:16px; padding:18px; margin-bottom:16px; background:#fcfcfc;">
                                     <div style="display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
@@ -3086,9 +3631,7 @@
 
             if (this.activeMgmtTab === 'properties') {
                 const grid = container.querySelector('.cards-grid');
-                const properties = this.managementLocation === 'all'
-                    ? this.inventory
-                    : this.inventory.filter(item => item.loc === this.managementLocation);
+                const properties = this.getFilteredInventory(this.managementLocation);
                 if (grid) properties.forEach(prop => grid.appendChild(this.createManagementPropertyCard(prop)));
             }
             if (this.activeMgmtTab === 'pl') {
@@ -3393,6 +3936,35 @@
                 this.render();
                 return;
             }
+
+            const signedInRole = this.currentUser?.role || this.role;
+            if (signedInRole === 'staff') {
+                if (r !== 'staff') {
+                    this.showNotification("Staff accounts can only access the staff dashboard.", "error");
+                    return;
+                }
+                this.setRole('staff');
+                return;
+            }
+
+            if (signedInRole === 'management') {
+                if (r === 'chairman' || r === 'host') {
+                    this.showNotification("Management accounts can only access management and staff dashboards.", "error");
+                    return;
+                }
+                this.setRole(r === 'staff' ? 'staff' : 'management');
+                return;
+            }
+
+            if (signedInRole === 'chairman') {
+                if (r === 'host') {
+                    this.showNotification("Chairman accounts do not have host access.", "error");
+                    return;
+                }
+                this.setRole(r);
+                return;
+            }
+
             if(r === 'staff') { this.setRole('staff'); return; }
             this.pendingRole = r;
             document.getElementById('pinModal').style.display = 'flex';
@@ -3425,7 +3997,7 @@
             const dot = document.getElementById('syncDot');
             if(dot) dot.className = `sync-dot ${s === 'online' ? 'online' : s === 'syncing' ? 'syncing' : 'offline'}`;
             const statusText = document.getElementById('syncStatus');
-            if(statusText) statusText.innerText = s === 'online' ? 'Engine Live' : s === 'syncing' ? 'Syncing...' : 'Local Mode';
+            if(statusText) statusText.innerText = s === 'online' ? 'Supabase Live' : s === 'syncing' ? 'Syncing...' : 'Offline';
         }
         
         closeModal() { closeModals(); }
