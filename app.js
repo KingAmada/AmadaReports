@@ -54,7 +54,7 @@
     }
 
     // View Switcher (SPA Navigation)
-    function switchView(view) {
+    async function switchView(view) {
         document.getElementById('homeView').style.display = view === 'home' ? 'block' : 'none';
         document.getElementById('topBanner').style.display = view === 'home' ? 'flex' : 'none';
         document.getElementById('mainHeader').style.display = (view === 'home' || view === 'guest') ? 'block' : 'none';
@@ -66,10 +66,14 @@
             if(!window.appInitialized) {
                 window.app = new AmadaApp();
                 window.appInitialized = true;
-            } else {
+            } else if (view === 'portal') {
                 window.app.render();
             }
-            if(view === 'guest' && window.app) window.app.renderGuestGrid();
+            if (window.app?.ready) await window.app.ready;
+            if(view === 'guest' && window.app) {
+                window.app.renderGuestGrid();
+                if (window.app.guestViewMode === 'map') window.app.initGuestMap();
+            }
         } else {
             portal.style.display = 'none';
         }
@@ -249,6 +253,10 @@
             this.setupCurrencyFormatting();
             await this.syncFromCloud();
             this.render();
+            if (document.getElementById('guestView')?.style.display === 'block') {
+                this.renderGuestGrid();
+                if (this.guestViewMode === 'map') this.initGuestMap();
+            }
             refreshFloatingLabels();
             this.setupPinEnter();
             this.startAutoSlide();
