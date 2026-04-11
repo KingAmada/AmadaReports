@@ -449,6 +449,12 @@
             }, true);
         }
 
+        getTodayIsoDate() {
+            const today = new Date();
+            const offsetMs = today.getTimezoneOffset() * 60000;
+            return new Date(today.getTime() - offsetMs).toISOString().split('T')[0];
+        }
+
         normalizeAmenities(amenities) {
             if (Array.isArray(amenities)) return amenities;
             if (!amenities) return [];
@@ -2341,6 +2347,8 @@
 
         getTransactionReceiptData(tx) {
             const prop = this.inventory.find(item => item.id === tx.propId);
+            const estimatedTotal = Number(tx.estimatedTotal) || 0;
+            const totalPaid = Number(tx.amount) || 0;
             return {
                 receiptNumber: tx.id || this.getTransactionId(tx),
                 guest: tx.guest,
@@ -2348,7 +2356,10 @@
                 location: prop?.loc || '',
                 checkIn: tx.checkIn || '',
                 checkOut: tx.checkOut || '',
-                total: tx.amount || 0,
+                total: totalPaid,
+                estimatedTotal,
+                totalPaid,
+                balance: Math.max(0, estimatedTotal - totalPaid),
                 code: tx.accessCode || '',
                 phone: tx.phone || '',
                 email: tx.email || '',
@@ -2405,7 +2416,8 @@
                                 <div style="text-align:right;"><div class="label">Check-Out</div><div class="value">${data.checkOut}</div></div>
                             </div>
                             <div class="row" style="margin-bottom:0;">
-                                <div><div class="label">Total Paid</div><div class="value">${this.formatCurrency(data.total)}</div></div>
+                                <div><div class="label">Total Paid</div><div class="value">${this.formatCurrency(data.totalPaid)}</div></div>
+                                <div style="text-align:center;"><div class="label">Balance</div><div class="value">${this.formatCurrency(data.balance)}</div></div>
                                 <div style="text-align:right;"><div class="label">Email</div><div class="value" style="font-size:15px;">${data.email || 'N/A'}</div></div>
                             </div>
                         </div>
@@ -2416,16 +2428,117 @@
             `;
         }
 
-        openReceiptWindow(data) {
-            const receiptWindow = window.open('', '_blank', 'width=900,height=800');
-            if (!receiptWindow) {
-                this.showNotification("Popup blocked. Allow popups to download receipt.", "error");
+        async downloadReceiptImage(data) {
+            const width = 1200;
+            const height = 1600;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+                this.showNotification("Receipt image could not be prepared.", "error");
                 return;
             }
-            receiptWindow.document.write(this.buildReceiptHtml(data));
-            receiptWindow.document.close();
-            receiptWindow.focus();
-            setTimeout(() => receiptWindow.print(), 250);
+
+            const radiusRect = (x, y, w, h, r, fill) => {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + w - r, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+                ctx.lineTo(x + w, y + h - r);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                ctx.lineTo(x + r, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+                ctx.lineTo(x, y + r);
+                ctx.quadraticCurveTo(x, y, x + r, y);
+                ctx.closePath();
+                if (fill) ctx.fill();
+            };
+
+            const writeText = (text, x, y, options = {}) => {
+                const {
+                    size = 34,
+                    weight = '400',
+                    color = '#1a1a1a',
+                    align = 'left',
+                    font = 'Poppins, Arial, sans-serif'
+                } = options;
+                ctx.font = `${weight} ${size}px ${font}`;
+                ctx.fillStyle = color;
+                ctx.textAlign = align;
+                ctx.fillText(String(text ?? ''), x, y);
+            };
+
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#ffffff';
+            radiusRect(70, 70, 1060, 1460, 36, true);
+
+            writeText('Amada Stays', 130, 170, { size: 54, weight: '700', color: '#ff385c' });
+            writeText('Booking Receipt', 130, 220, { size: 24, color: '#666666' });
+
+            ctx.fillStyle = '#fff0f3';
+            radiusRect(870, 110, 170, 58, 29, true);
+            writeText('CONFIRMED', 955, 148, { size: 20, weight: '700', color: '#ff385c', align: 'center' });
+            writeText(`Receipt: ${data.receiptNumber}`, 1040, 210, { size: 22, color: '#666666', align: 'right' });
+            writeText(data.date || '', 1040, 245, { size: 22, color: '#666666', align: 'right' });
+
+            ctx.fillStyle = '#fafafa';
+            radiusRect(120, 290, 960, 250, 28, true);
+            ctx.strokeStyle = '#eeeeee';
+            ctx.lineWidth = 2;
+            radiusRect(120, 290, 960, 250, 28, false);
+            ctx.stroke();
+
+            writeText('GUEST', 160, 350, { size: 18, weight: '700', color: '#777777' });
+            writeText(data.guest, 160, 392, { size: 34, weight: '700' });
+            writeText('PHONE', 1040, 350, { size: 18, weight: '700', color: '#777777', align: 'right' });
+            writeText(data.phone, 1040, 392, { size: 34, weight: '700', align: 'right' });
+            writeText('PROPERTY', 160, 465, { size: 18, weight: '700', color: '#777777' });
+            writeText(data.property, 160, 507, { size: 34, weight: '700' });
+            writeText('LOCATION', 1040, 465, { size: 18, weight: '700', color: '#777777', align: 'right' });
+            writeText(data.location || 'N/A', 1040, 507, { size: 34, weight: '700', align: 'right' });
+
+            ctx.fillStyle = '#fafafa';
+            radiusRect(120, 580, 960, 330, 28, true);
+            ctx.strokeStyle = '#eeeeee';
+            ctx.lineWidth = 2;
+            radiusRect(120, 580, 960, 330, 28, false);
+            ctx.stroke();
+
+            writeText('CHECK-IN', 160, 640, { size: 18, weight: '700', color: '#777777' });
+            writeText(data.checkIn || 'N/A', 160, 682, { size: 34, weight: '700' });
+            writeText('CHECK-OUT', 1040, 640, { size: 18, weight: '700', color: '#777777', align: 'right' });
+            writeText(data.checkOut || 'N/A', 1040, 682, { size: 34, weight: '700', align: 'right' });
+
+            writeText('TOTAL PAID', 160, 780, { size: 18, weight: '700', color: '#777777' });
+            writeText(this.formatCurrency(data.totalPaid), 160, 822, { size: 40, weight: '700', color: '#ff385c' });
+            writeText('BALANCE', 560, 780, { size: 18, weight: '700', color: '#777777', align: 'center' });
+            writeText(this.formatCurrency(data.balance), 560, 822, { size: 40, weight: '700', align: 'center' });
+            writeText('EMAIL', 1040, 780, { size: 18, weight: '700', color: '#777777', align: 'right' });
+            writeText(data.email || 'N/A', 1040, 822, { size: 24, weight: '700', align: 'right' });
+
+            ctx.strokeStyle = '#dddddd';
+            ctx.lineWidth = 3;
+            ctx.setLineDash([10, 10]);
+            ctx.beginPath();
+            ctx.moveTo(160, 860);
+            ctx.lineTo(1040, 860);
+            ctx.stroke();
+            ctx.setLineDash([]);
+
+            ctx.fillStyle = '#1a1a1a';
+            radiusRect(120, 960, 960, 260, 28, true);
+            writeText('SMART LOCK ACCESS CODE', 600, 1035, { size: 20, weight: '700', color: '#aaaaaa', align: 'center' });
+            writeText(data.code || 'N/A', 600, 1135, { size: 76, weight: '700', color: '#ffd700', align: 'center', font: 'monospace' });
+            writeText('Use this code to unlock the door during your stay.', 600, 1195, { size: 24, color: '#888888', align: 'center' });
+
+            const link = document.createElement('a');
+            link.download = `amada-receipt-${data.receiptNumber}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
         }
 
         downloadCurrentReceipt() {
@@ -2433,7 +2546,7 @@
                 this.showNotification("No receipt available to download.", "error");
                 return;
             }
-            this.openReceiptWindow(this.currentReceiptData);
+            this.downloadReceiptImage(this.currentReceiptData);
         }
 
         downloadGuestReceipt(transactionId) {
@@ -2442,7 +2555,7 @@
                 this.showNotification("Reservation receipt not found.", "error");
                 return;
             }
-            this.openReceiptWindow(this.getTransactionReceiptData(tx));
+            this.downloadReceiptImage(this.getTransactionReceiptData(tx));
         }
 
         lookupGuestReservations() {
@@ -4099,10 +4212,13 @@
             
             // Auto-set dates to Today and Tomorrow to trigger estimate immediately
             const today = new Date();
+            const todayIso = this.getTodayIsoDate();
             const tomorrow = new Date(today);
             tomorrow.setDate(tomorrow.getDate() + 1);
             
-            document.getElementById('checkInDate').value = today.toISOString().split('T')[0];
+            document.getElementById('checkInDate').min = todayIso;
+            document.getElementById('checkOutDate').min = todayIso;
+            document.getElementById('checkInDate').value = todayIso;
             document.getElementById('checkOutDate').value = tomorrow.toISOString().split('T')[0];
 
             // Clear previous inputs
@@ -4126,6 +4242,11 @@
         calcTotal() {
             const checkInEl = document.getElementById('checkInDate');
             const checkOutEl = document.getElementById('checkOutDate');
+            const todayIso = this.getTodayIsoDate();
+
+            if (checkInEl.value && checkInEl.value < todayIso) {
+                checkInEl.value = todayIso;
+            }
             
             let d1 = new Date(checkInEl.value);
             let d2 = new Date(checkOutEl.value);
@@ -4172,6 +4293,12 @@
                  this.showNotification("Please fill in all required details (Name, Phone, Amount)", "error"); return;
             }
 
+            const todayIso = this.getTodayIsoDate();
+            if (!checkIn || !checkOut || checkIn < todayIso) {
+                this.showNotification("Check-in date cannot be before today.", "error");
+                return;
+            }
+
             const btn = document.getElementById('btnConfirm');
             const originalText = btn.innerHTML;
             
@@ -4204,6 +4331,8 @@
             document.getElementById('recIn').innerText = receiptData.checkIn;
             document.getElementById('recOut').innerText = receiptData.checkOut;
             document.getElementById('recTotal').innerText = this.formatCurrency(receiptData.total);
+            document.getElementById('recPaid').innerText = this.formatCurrency(receiptData.totalPaid);
+            document.getElementById('recBalance').innerText = this.formatCurrency(receiptData.balance);
             document.getElementById('recCode').innerText = receiptData.code;
 
             document.getElementById('receiptModal').style.display = 'flex';
