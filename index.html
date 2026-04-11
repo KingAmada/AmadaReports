@@ -355,12 +355,12 @@
             
             <form id="hostLoginForm" onsubmit="event.preventDefault(); submitLogin();">
                 <div id="hostLoginFields">
-                    <div class="input-floating"><input type="text" id="loginEmail" required><label>Email Address or Phone Number</label></div>
+                    <div class="input-floating"><input type="email" id="loginEmail" required><label>Email Address</label></div>
                     <div class="input-floating"><input type="password" id="loginPass" required><label>Password</label></div>
                 </div>
                 <div id="staffLoginFields" style="display:none;">
-                    <div class="input-floating"><input type="text" id="loginStaffId"><label>Staff ID / Email</label></div>
-                    <div class="input-floating"><input type="password" id="loginPin" placeholder="••••" style="text-align:center; font-size:2rem; letter-spacing:15px; padding:15px;"><label>Staff/Exec PIN</label></div>
+                    <div class="input-floating"><input type="email" id="loginStaffId"><label>Team Email</label></div>
+                    <div class="input-floating"><input type="password" id="loginPin" placeholder="••••" style="text-align:center; font-size:2rem; letter-spacing:15px; padding:15px;"><label>Team Password / PIN</label></div>
                 </div>
                 <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:15px;">Authorize Access</button>
             </form>
@@ -555,8 +555,8 @@
                     <label>Email Address</label>
                 </div>
                 <div class="input-floating">
-                    <input type="tel" id="hostPhone" required pattern="[0-9]{10,15}" title="Please enter a valid phone number (10-15 digits only)" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                    <label>Phone Number</label>
+                    <input type="tel" id="hostPhone" required maxlength="11" pattern="[0-9]{11}" title="Please enter exactly 11 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
+                    <label>Phone Number (11 digits)</label>
                 </div>
                 <div class="input-floating">
                     <input type="password" id="hostPassword" required minlength="6">

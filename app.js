@@ -43,11 +43,11 @@
         if (currentLoginMode === 'host') {
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPass').value;
-            window.app.loginHost(email, pass);
+            await window.app.loginHost(email, pass);
         } else {
             const staffId = document.getElementById('loginStaffId').value;
             const pin = document.getElementById('loginPin').value;
-            window.app.loginStaff(staffId, pin);
+            await window.app.loginStaff(staffId, pin);
         }
         
         document.getElementById('hostLoginForm').reset();
@@ -179,10 +179,19 @@
             
             const name = document.getElementById('hostFullName').value;
             const email = document.getElementById('hostEmail').value;
-            const phone = document.getElementById('hostPhone').value;
+            const phone = document.getElementById('hostPhone').value.trim();
             const pass = document.getElementById('hostPassword').value;
+
+            if (!/^\d{11}$/.test(phone)) {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                openHostModal();
+                document.getElementById('hostPhone').focus();
+                form.reportValidity();
+                return;
+            }
             
-            window.app.registerNewHost(name, email, phone, pass);
+            await window.app.registerNewHost(name, email, phone, pass);
             
             // Reset form and button state for next time
             form.reset();
@@ -201,6 +210,7 @@
             this.syncDebounceTimer = null;
             this.syncInFlight = null;
             this.syncQueued = false;
+            this.authUser = null;
             
             this.role = 'staff';
             this.pendingRole = null;
@@ -260,6 +270,7 @@
 
         async init() {
             this.setupCurrencyFormatting();
+            await this.restoreAuthenticatedSession();
             await this.syncFromCloud();
             this.render();
             if (document.getElementById('guestView')?.style.display === 'block') {
@@ -566,7 +577,15 @@
 
         scheduleRemoteSync() {
             if (this.syncDebounceTimer) clearTimeout(this.syncDebounceTimer);
-            this.syncDebounceTimer = setTimeout(() => this.syncToCloud(), 150);
+            this.syncDebounceTimer = setTimeout(async () => {
+                try {
+                    const authUser = await this.getAuthenticatedUser();
+                    if (authUser) await this.syncToCloud();
+                } catch (e) {
+                    this.updateSyncUI('offline');
+                    console.warn('Deferred sync failed:', e);
+                }
+            }, 150);
         }
 
         getSystemHostRecord() {
@@ -579,6 +598,10 @@
         }
 
         getHostsForPersistence() {
+            if (this.authUser && this.currentHostEmail) {
+                return this.hosts.filter(host => host.email === this.currentHostEmail);
+            }
+
             const hosts = [...this.hosts];
             const needsSystemHost = this.inventory.some(item => item.hostEmail === 'admin@amada.com') ||
                 this.teamMembers.some(member => (member.createdBy || '') === 'system');
@@ -593,6 +616,157 @@
             const { data, error } = await this.supabase.from(table).select('*');
             if (error) throw error;
             return data || [];
+        }
+
+        async getAuthenticatedUser() {
+            if (!this.supabase?.auth) return null;
+            const { data, error } = await this.supabase.auth.getSession();
+            if (error) throw error;
+            this.authUser = data.session?.user || null;
+            return this.authUser;
+        }
+
+        applyHostSession(host) {
+            if (!host) return;
+            this.role = 'host';
+            this.hostDashboardRole = 'host';
+            this.currentHostEmail = host.email;
+            this.currentUser = {
+                name: host.name,
+                role: 'host',
+                id: host.email,
+                email: host.email
+            };
+
+            const existingIndex = this.hosts.findIndex(item => item.email === host.email);
+            if (existingIndex >= 0) {
+                this.hosts[existingIndex] = host;
+            } else {
+                this.hosts.push(host);
+            }
+        }
+
+        async hydrateHostFromAuthUser(user, emailHint = null) {
+            if (!this.supabase || !user) return null;
+
+            let { data: hostRow, error } = await this.supabase
+                .from('hosts')
+                .select('*')
+                .eq('auth_user_id', user.id)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            const normalizedEmail = String(emailHint || user.email || '').trim().toLowerCase();
+            if (!hostRow && normalizedEmail) {
+                const { error: claimError } = await this.supabase
+                    .from('hosts')
+                    .update({ auth_user_id: user.id })
+                    .eq('email', normalizedEmail)
+                    .is('auth_user_id', null);
+
+                if (claimError) throw claimError;
+
+                const claimed = await this.supabase
+                    .from('hosts')
+                    .select('*')
+                    .eq('auth_user_id', user.id)
+                    .maybeSingle();
+
+                if (claimed.error) throw claimed.error;
+                hostRow = claimed.data;
+            }
+
+            if (!hostRow) return null;
+
+            const host = {
+                name: hostRow.full_name,
+                email: hostRow.email,
+                phone: hostRow.phone || '',
+                password: hostRow.password || ''
+            };
+            this.applyHostSession(host);
+            return host;
+        }
+
+        applyTeamSession(member) {
+            if (!member) return;
+            this.role = member.role;
+            this.currentHostEmail = member.createdBy || null;
+            this.currentUser = {
+                name: member.name,
+                role: member.role,
+                id: member.staffId,
+                email: member.email || ''
+            };
+
+            const existingIndex = this.teamMembers.findIndex(item => item.staffId === member.staffId);
+            if (existingIndex >= 0) {
+                this.teamMembers[existingIndex] = member;
+            } else {
+                this.teamMembers.push(member);
+            }
+        }
+
+        async hydrateTeamMemberFromAuthUser(user, emailHint = null) {
+            if (!this.supabase || !user) return null;
+
+            let { data: teamRow, error } = await this.supabase
+                .from('team_members')
+                .select('*, hosts!team_members_host_id_fkey(email)')
+                .eq('auth_user_id', user.id)
+                .maybeSingle();
+
+            if (error) throw error;
+
+            const normalizedEmail = String(emailHint || user.email || '').trim().toLowerCase();
+            if (!teamRow && normalizedEmail) {
+                const { error: claimError } = await this.supabase
+                    .from('team_members')
+                    .update({ auth_user_id: user.id })
+                    .eq('email', normalizedEmail)
+                    .is('auth_user_id', null);
+
+                if (claimError) throw claimError;
+
+                const claimed = await this.supabase
+                    .from('team_members')
+                    .select('*, hosts!team_members_host_id_fkey(email)')
+                    .eq('auth_user_id', user.id)
+                    .maybeSingle();
+
+                if (claimed.error) throw claimed.error;
+                teamRow = claimed.data;
+            }
+
+            if (!teamRow) return null;
+
+            const member = {
+                id: teamRow.id,
+                name: teamRow.full_name,
+                role: teamRow.role,
+                staffId: teamRow.staff_id,
+                email: teamRow.email || '',
+                phone: teamRow.phone || '',
+                pin: teamRow.pin || '',
+                createdBy: teamRow.hosts?.email || null
+            };
+            this.applyTeamSession(member);
+            return member;
+        }
+
+        async restoreAuthenticatedSession() {
+            try {
+                const user = await this.getAuthenticatedUser();
+                if (!user) return null;
+                const host = await this.hydrateHostFromAuthUser(user, user.email);
+                if (host) return host;
+                return await this.hydrateTeamMemberFromAuthUser(user, user.email);
+            } catch (e) {
+                console.warn('Could not restore authenticated session:', e);
+                this.authUser = null;
+                return null;
+            }
         }
 
         async syncTableById(table, rows) {
@@ -613,22 +787,19 @@
         }
 
         async syncHostsTable(hostRows) {
-            const { data: existingHosts, error: selectError } = await this.supabase.from('hosts').select('email');
-            if (selectError) throw selectError;
+            if (!this.authUser || !this.currentHostEmail) return [];
 
-            if (hostRows.length > 0) {
-                const { error: upsertError } = await this.supabase.from('hosts').upsert(hostRows, { onConflict: 'email' });
+            const scopedRows = hostRows.filter(row => row.email === this.currentHostEmail);
+
+            if (scopedRows.length > 0) {
+                const { error: upsertError } = await this.supabase.from('hosts').upsert(scopedRows, { onConflict: 'email' });
                 if (upsertError) throw upsertError;
             }
 
-            const nextEmails = new Set(hostRows.map(row => row.email));
-            const emailsToDelete = (existingHosts || []).map(row => row.email).filter(email => !nextEmails.has(email));
-            if (emailsToDelete.length > 0) {
-                const { error: deleteError } = await this.supabase.from('hosts').delete().in('email', emailsToDelete);
-                if (deleteError) throw deleteError;
-            }
-
-            const { data: hosts, error: refreshError } = await this.supabase.from('hosts').select('id, email');
+            const { data: hosts, error: refreshError } = await this.supabase
+                .from('hosts')
+                .select('id, email, auth_user_id')
+                .eq('auth_user_id', this.authUser.id);
             if (refreshError) throw refreshError;
             return hosts || [];
         }
@@ -672,6 +843,7 @@
 
         mapHostToRow(host) {
             return {
+                auth_user_id: host.email === this.currentHostEmail ? (this.authUser?.id || null) : null,
                 full_name: host.name,
                 email: host.email,
                 phone: host.phone || null,
@@ -821,6 +993,30 @@
 
             this.updateSyncUI('syncing');
             try {
+                const authUser = await this.getAuthenticatedUser();
+                if (!authUser) {
+                    const propertyRows = await this.fetchAllRows('properties');
+                    if (propertyRows.length > 0) {
+                        this.inventory = propertyRows.map(row => ({
+                            id: row.id,
+                            loc: row.location,
+                            name: row.property_name,
+                            price: Number(row.nightly_price) || 0,
+                            type: row.property_type,
+                            status: row.status || 'available',
+                            hostEmail: 'public@amada.com',
+                            guestName: row.guest_name || null,
+                            accessCode: row.access_code || null,
+                            images: Array.isArray(row.images) ? row.images : [],
+                            amenities: this.normalizeAmenities(row.amenities),
+                            coords: row.coords || {}
+                        }));
+                    }
+                    this.updateSyncUI('online');
+                    return;
+                }
+
+                await this.hydrateHostFromAuthUser(authUser, authUser.email);
                 const hostsRows = await this.fetchAllRows('hosts');
                 const hostEmailById = new Map(hostsRows.map(row => [row.id, row.email]));
                 this.hosts = hostsRows
@@ -990,6 +1186,12 @@
                 return;
             }
 
+            const authUser = await this.getAuthenticatedUser();
+            if (!authUser) {
+                this.updateSyncUI('offline');
+                return;
+            }
+
             if (this.syncInFlight) {
                 this.syncQueued = true;
                 return this.syncInFlight;
@@ -1004,6 +1206,23 @@
             });
 
             return this.syncInFlight;
+        }
+
+        async saveGuestBookingToCloud(transaction) {
+            if (!this.supabase) return false;
+
+            const { error } = await this.supabase
+                .from('bookings')
+                .insert(this.mapBookingToRow(transaction));
+
+            if (error) {
+                console.warn('Guest booking sync failed:', error);
+                this.updateSyncUI('offline');
+                return false;
+            }
+
+            this.updateSyncUI('online');
+            return true;
         }
 
         async performSupabaseSync() {
@@ -1092,56 +1311,135 @@
 
         // --- NEW HOST & GUEST LOGIC ---
         
-        loginHost(identifier, pass) {
+        async loginHost(identifier, pass) {
             const normalized = (identifier || '').trim().toLowerCase();
-            const host = this.hosts.find(h =>
-                (((h.email || '').toLowerCase() === normalized) || ((h.phone || '') === identifier.trim())) &&
-                h.password === pass
-            );
-            if(host) {
-                this.role = 'host';
-                this.hostDashboardRole = 'host';
-                this.currentHostEmail = host.email;
-                this.currentUser = { name: host.name, role: 'host', id: host.email, email: host.email };
-                this.showNotification(`Welcome back, ${host.name}`, "success");
-                switchView('portal');
-            } else {
-                this.showNotification("Invalid host credentials", "error");
-            }
-        }
-        
-        loginStaff(identifier, pin) {
-            const normalizedId = (identifier || '').trim().toLowerCase();
-            const member = this.teamMembers.find(teamMember =>
-                (teamMember.staffId || '').toLowerCase() === normalizedId ||
-                (teamMember.email || '').toLowerCase() === normalizedId
-            );
-
-            if (!member || member.pin !== pin) {
-                this.showNotification("Invalid team access credentials", "error");
+            if (!this.supabase?.auth) {
+                this.showNotification("Supabase Auth is unavailable in this environment.", "error");
                 return;
             }
 
-            this.role = member.role;
-            this.currentHostEmail = null;
-            this.currentUser = { name: member.name, role: member.role, id: member.staffId, email: member.email || '' };
+            const { data, error } = await this.supabase.auth.signInWithPassword({
+                email: normalized,
+                password: pass
+            });
+
+            if (error || !data.user) {
+                this.showNotification("Invalid host credentials", "error");
+                return;
+            }
+
+            this.authUser = data.user;
+            const host = await this.hydrateHostFromAuthUser(data.user, normalized);
+            if (!host) {
+                this.showNotification("Host profile not found for this authenticated account.", "error");
+                return;
+            }
+
+            this.showNotification(`Welcome back, ${host.name}`, "success");
+            await switchView('portal');
+        }
+        
+        async loginStaff(identifier, pin) {
+            const normalizedEmail = (identifier || '').trim().toLowerCase();
+            if (!normalizedEmail || !pin) {
+                this.showNotification("Enter your team email and password.", "error");
+                return;
+            }
+
+            if (!this.supabase?.auth) {
+                this.showNotification("Supabase Auth is unavailable in this environment.", "error");
+                return;
+            }
+
+            let authResult = await this.supabase.auth.signInWithPassword({
+                email: normalizedEmail,
+                password: pin
+            });
+
+            if (authResult.error || !authResult.data.user) {
+                const signUpResult = await this.supabase.auth.signUp({
+                    email: normalizedEmail,
+                    password: pin
+                });
+
+                if (signUpResult.error || !signUpResult.data.user) {
+                    this.showNotification("Invalid team access credentials", "error");
+                    return;
+                }
+
+                if (!signUpResult.data.session) {
+                    this.showNotification("Team account created. Complete email verification, then log in.", "info");
+                    return;
+                }
+
+                authResult = signUpResult;
+            }
+
+            this.authUser = authResult.data.user;
+            const member = await this.hydrateTeamMemberFromAuthUser(authResult.data.user, normalizedEmail);
+            if (!member) {
+                this.showNotification("Team profile not found for this authenticated account.", "error");
+                return;
+            }
+
             this.showNotification(`${member.name} signed in as ${member.role}`, "success");
-            switchView('portal');
+            await switchView('portal');
         }
 
-        registerNewHost(name, email, phone, pass) {
-            if(this.hosts.find(h => h.email === email)) {
-                this.showNotification("Email already registered.", "error"); return;
+        async registerNewHost(name, email, phone, pass) {
+            const normalizedEmail = String(email || '').trim().toLowerCase();
+            if (!this.supabase?.auth) {
+                this.showNotification("Supabase Auth is unavailable in this environment.", "error");
+                return;
             }
-            this.hosts.push({ name, email, phone, password: pass });
-            
-            this.role = 'host';
-            this.hostDashboardRole = 'host';
-            this.currentHostEmail = email;
-            this.currentUser = { name, role: 'host', id: email, email };
+
+            const { data, error } = await this.supabase.auth.signUp({
+                email: normalizedEmail,
+                password: pass,
+                options: {
+                    data: {
+                        full_name: name,
+                        phone
+                    }
+                }
+            });
+
+            if (error || !data.user) {
+                this.showNotification(error?.message || "Could not create host account.", "error");
+                return;
+            }
+
+            if (!data.session) {
+                this.showNotification("Account created. Complete email verification, then log in.", "info");
+                return;
+            }
+
+            this.authUser = data.user;
+
+            const { error: hostError } = await this.supabase
+                .from('hosts')
+                .upsert([{
+                    auth_user_id: data.user.id,
+                    full_name: name,
+                    email: normalizedEmail,
+                    phone,
+                    password: pass
+                }], { onConflict: 'email' });
+
+            if (hostError) {
+                this.showNotification(hostError.message || "Host profile could not be linked.", "error");
+                return;
+            }
+
+            const host = await this.hydrateHostFromAuthUser(data.user, normalizedEmail);
+            if (!host) {
+                this.showNotification("Host profile was created but could not be loaded.", "error");
+                return;
+            }
+
             this.saveLocalData();
             this.showNotification(`Profile created successfully! Welcome to Amada Engine.`, "success");
-            switchView('portal');
+            await switchView('portal');
         }
 
         renderHostDashboard(container) {
@@ -1206,7 +1504,7 @@
                                     <label style="top:5px; font-size:0.7rem;">Position</label>
                                 </div>
                                 <div class="input-floating"><input type="text" id="teamMemberStaffId" readonly required><label>Staff ID</label></div>
-                                <div class="input-floating"><input type="email" id="teamMemberEmail"><label>Email (Optional)</label></div>
+                                <div class="input-floating"><input type="email" id="teamMemberEmail" required><label>Email Address</label></div>
                                 <div class="input-floating"><input type="password" id="teamMemberPin" required><label>Access PIN</label></div>
                             </div>
                             <button class="btn-primary" style="margin-top:10px; justify-content:center;">
@@ -1254,7 +1552,7 @@
             const email = document.getElementById('teamMemberEmail').value.trim();
             const pin = document.getElementById('teamMemberPin').value.trim();
 
-            if (!name || !role || !staffId || !pin) {
+            if (!name || !role || !staffId || !email || !pin) {
                 this.showNotification("Complete the team access form before saving.", "error");
                 return;
             }
@@ -4321,6 +4619,12 @@
             this.transactions.push(transaction);
 
             this.saveLocalData();
+            if (this.activeModalMode === 'guest') {
+                const authUser = await this.getAuthenticatedUser().catch(() => null);
+                if (!authUser) {
+                    await this.saveGuestBookingToCloud(transaction);
+                }
+            }
             closeModalById('bookingModal');
             
             // Populate and Show the Beautiful Receipt Modal
