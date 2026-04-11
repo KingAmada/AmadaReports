@@ -101,6 +101,15 @@
         });
     }
 
+    function closeModalById(id) {
+        const modal = document.getElementById(id);
+        if (!modal) return;
+        modal.classList.remove('show');
+        setTimeout(() => {
+            modal.style.display = 'none';
+        }, 300);
+    }
+
     function refreshFloatingLabels(root = document) {
         root.querySelectorAll('.input-floating').forEach(wrapper => {
             const field = wrapper.querySelector('input, select, textarea');
@@ -4185,7 +4194,7 @@
             this.transactions.push(transaction);
 
             this.saveLocalData();
-            this.closeModal(); // Closes the booking modal
+            closeModalById('bookingModal');
             
             // Populate and Show the Beautiful Receipt Modal
             const receiptData = this.getTransactionReceiptData(transaction);
