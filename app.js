@@ -94,6 +94,12 @@
         setTimeout(() => document.getElementById('hostModal').classList.add('show'), 10);
     }
 
+    function clearAuthUrlState() {
+        if (!window.location.hash && !window.location.search) return;
+        const cleanUrl = `${window.location.origin}${window.location.pathname}`;
+        window.history.replaceState({}, document.title, cleanUrl);
+    }
+
     function closeModals() {
         document.querySelectorAll('.modal').forEach(m => { 
             m.classList.remove('show'); 
@@ -270,9 +276,11 @@
 
         async init() {
             this.setupCurrencyFormatting();
+            const authFeedback = this.readAuthFeedbackFromUrl();
             await this.restoreAuthenticatedSession();
             await this.syncFromCloud();
             this.render();
+            this.handleAuthFeedback(authFeedback);
             if (document.getElementById('guestView')?.style.display === 'block') {
                 this.renderGuestGrid();
                 if (this.guestViewMode === 'map') this.initGuestMap();
@@ -464,6 +472,53 @@
             const today = new Date();
             const offsetMs = today.getTimezoneOffset() * 60000;
             return new Date(today.getTime() - offsetMs).toISOString().split('T')[0];
+        }
+
+        readAuthFeedbackFromUrl() {
+            const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+            const queryParams = new URLSearchParams(window.location.search);
+            const params = hashParams.toString() ? hashParams : queryParams;
+            if (!params.toString()) return null;
+
+            return {
+                accessToken: params.get('access_token'),
+                error: params.get('error'),
+                errorCode: params.get('error_code'),
+                errorDescription: params.get('error_description')
+            };
+        }
+
+        handleAuthFeedback(feedback) {
+            if (!feedback) return;
+
+            if (feedback.accessToken) {
+                clearAuthUrlState();
+                if (this.currentUser) {
+                    this.showNotification("Email confirmed. You're now signed in.", "success");
+                    switchView('portal');
+                } else {
+                    this.showNotification("Email confirmed. You can now sign in.", "success");
+                    openLoginModal();
+                }
+                return;
+            }
+
+            if (feedback.error) {
+                clearAuthUrlState();
+                const message = feedback.errorCode === 'otp_expired'
+                    ? "That confirmation link is invalid or expired. Request a fresh signup email and try again."
+                    : decodeURIComponent(feedback.errorDescription || "Authentication could not be completed.");
+                this.showNotification(message, "error");
+                openLoginModal();
+            }
+        }
+
+        getAuthRedirectUrl() {
+            const { origin, pathname } = window.location;
+            const cleanPath = pathname.endsWith('index.html')
+                ? pathname.slice(0, -'index.html'.length)
+                : pathname;
+            return `${origin}${cleanPath}`;
         }
 
         normalizeAmenities(amenities) {
@@ -1359,7 +1414,10 @@
             if (authResult.error || !authResult.data.user) {
                 const signUpResult = await this.supabase.auth.signUp({
                     email: normalizedEmail,
-                    password: pin
+                    password: pin,
+                    options: {
+                        emailRedirectTo: this.getAuthRedirectUrl()
+                    }
                 });
 
                 if (signUpResult.error || !signUpResult.data.user) {
@@ -1397,6 +1455,7 @@
                 email: normalizedEmail,
                 password: pass,
                 options: {
+                    emailRedirectTo: this.getAuthRedirectUrl(),
                     data: {
                         full_name: name,
                         phone
