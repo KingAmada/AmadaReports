@@ -701,7 +701,7 @@
             }
         }
 
-        async hydrateHostFromAuthUser(user, emailHint = null) {
+        async hydrateHostFromAuthUser(user, emailHint = null, passwordHint = null) {
             if (!this.supabase || !user) return null;
 
             let { data: hostRow, error } = await this.supabase
@@ -730,6 +730,30 @@
 
                 if (claimed.error) throw claimed.error;
                 hostRow = claimed.data;
+            }
+
+            if (!hostRow && normalizedEmail) {
+                const metadata = user.user_metadata || {};
+                const fallbackName = normalizedEmail.includes('@')
+                    ? normalizedEmail.split('@')[0].replace(/[._-]+/g, ' ').trim()
+                    : 'Host';
+                const fullName = String(metadata.full_name || metadata.name || fallbackName || 'Host').trim();
+                const phone = String(metadata.phone || '').trim();
+
+                const { data: inserted, error: insertError } = await this.supabase
+                    .from('hosts')
+                    .insert({
+                        auth_user_id: user.id,
+                        full_name: fullName || 'Host',
+                        email: normalizedEmail,
+                        phone: phone || null,
+                        password: passwordHint || metadata.password || 'supabase-auth-managed'
+                    })
+                    .select('*')
+                    .single();
+
+                if (insertError) throw insertError;
+                hostRow = inserted;
             }
 
             if (!hostRow) return null;
@@ -1384,7 +1408,7 @@
             }
 
             this.authUser = data.user;
-            const host = await this.hydrateHostFromAuthUser(data.user, normalized);
+            const host = await this.hydrateHostFromAuthUser(data.user, normalized, pass);
             if (!host) {
                 this.showNotification("Host profile not found for this authenticated account.", "error");
                 return;
@@ -1469,7 +1493,7 @@
             }
 
             if (!data.session) {
-                this.showNotification("Account created. Complete email verification, then log in.", "info");
+                this.showNotification("Account created. Complete email verification, then log in. Your host profile will finish linking on first sign-in.", "info");
                 return;
             }
 
