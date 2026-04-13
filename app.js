@@ -828,7 +828,11 @@
                 email: teamRow.email || '',
                 phone: teamRow.phone || '',
                 pin: teamRow.pin || '',
-                createdBy: teamRow.hosts?.email || null
+                createdBy: teamRow.hosts?.email || null,
+                assignmentScope: teamRow.assignment_scope || 'admin',
+                assignedPropertyId: teamRow.assigned_property_id || '',
+                assignmentLabel: teamRow.assignment_label || (teamRow.assignment_scope === 'executive' ? 'Executive Office' : 'Admin Office'),
+                badgeLogoUrl: teamRow.badge_logo_url || ''
             };
             this.applyTeamSession(member);
             return member;
@@ -1139,7 +1143,11 @@
                     email: row.email || '',
                     phone: row.phone || '',
                     pin: row.pin,
-                    createdBy: hostEmailById.get(row.host_id) || 'admin@amada.com'
+                    createdBy: hostEmailById.get(row.host_id) || 'admin@amada.com',
+                    assignmentScope: row.assignment_scope || 'admin',
+                    assignedPropertyId: row.assigned_property_id || '',
+                    assignmentLabel: row.assignment_label || (row.assignment_scope === 'executive' ? 'Executive Office' : 'Admin Office'),
+                    badgeLogoUrl: row.badge_logo_url || ''
                 }));
 
                 if (propertyRows.length > 0) {
@@ -1324,6 +1332,10 @@
                             email: member.email || null,
                             phone: member.phone || null,
                             pin: member.pin,
+                            assignment_scope: member.assignmentScope || 'admin',
+                            assigned_property_id: member.assignedPropertyId || null,
+                            assignment_label: member.assignmentLabel || null,
+                            badge_logo_url: member.badgeLogoUrl || null,
                             is_active: true
                         };
                     })
@@ -1529,6 +1541,14 @@
             const myProps = this.inventory.filter(i => i.hostEmail === this.currentHostEmail);
             const occCount = myProps.filter(i => i.status === 'occupied').length;
             const myTeamMembers = this.teamMembers.filter(member => member.createdBy === this.currentHostEmail);
+            const assignmentOptions = [
+                { value: 'office:admin', label: 'Admin Office' },
+                { value: 'office:executive', label: 'Executive Office' },
+                ...myProps.map(property => ({
+                    value: `property:${property.id}`,
+                    label: property.name
+                }))
+            ];
             
             // Estimate earnings from transactions linked to my properties
             const myPropIds = myProps.map(p => p.id);
@@ -1586,6 +1606,12 @@
                                     </select>
                                     <label style="top:5px; font-size:0.7rem;">Position</label>
                                 </div>
+                                <div class="input-floating">
+                                    <select id="teamMemberAssignment" onchange="app.refreshTeamMemberStaffId()" required>
+                                        ${assignmentOptions.map(option => `<option value="${option.value}">${option.label}</option>`).join('')}
+                                    </select>
+                                    <label style="top:5px; font-size:0.7rem;">Assign To</label>
+                                </div>
                                 <div class="input-floating"><input type="text" id="teamMemberStaffId" readonly required><label>Staff ID</label></div>
                                 <div class="input-floating"><input type="email" id="teamMemberEmail" required><label>Email Address</label></div>
                                 <div class="input-floating"><input type="password" id="teamMemberPin" required><label>Access PIN</label></div>
@@ -1600,10 +1626,16 @@
                                     <div>
                                         <div style="font-weight:700;">${member.name}</div>
                                         <div style="font-size:0.84rem; color:var(--gray);">${member.role.toUpperCase()} • ${member.staffId}${member.email ? ` • ${member.email}` : ''}</div>
+                                        <div style="font-size:0.8rem; color:var(--gray); margin-top:4px;">Assigned to ${member.assignmentLabel || 'Admin Office'}</div>
                                     </div>
-                                    <button class="btn-outline" onclick="app.removeTeamMember('${member.id}')" style="border-color:var(--danger); color:var(--danger);">
-                                        <i class="fa-solid fa-trash"></i> Remove
-                                    </button>
+                                    <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                                        <button class="btn-outline" onclick="app.downloadTeamMemberId('${member.id}')">
+                                            <i class="fa-solid fa-id-card"></i> Download ID
+                                        </button>
+                                        <button class="btn-outline" onclick="app.removeTeamMember('${member.id}')" style="border-color:var(--danger); color:var(--danger);">
+                                            <i class="fa-solid fa-trash"></i> Remove
+                                        </button>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -1631,11 +1663,13 @@
         addTeamMember() {
             const name = document.getElementById('teamMemberName').value.trim();
             const role = document.getElementById('teamMemberRole').value;
+            const assignmentValue = document.getElementById('teamMemberAssignment').value;
             const staffId = document.getElementById('teamMemberStaffId').value.trim();
             const email = document.getElementById('teamMemberEmail').value.trim();
             const pin = document.getElementById('teamMemberPin').value.trim();
+            const assignment = this.getTeamAssignmentDetails(assignmentValue);
 
-            if (!name || !role || !staffId || !email || !pin) {
+            if (!name || !role || !assignmentValue || !staffId || !email || !pin) {
                 this.showNotification("Complete the team access form before saving.", "error");
                 return;
             }
@@ -1656,7 +1690,11 @@
                 staffId,
                 email,
                 pin,
-                createdBy: this.currentHostEmail
+                createdBy: this.currentHostEmail,
+                assignmentScope: assignment.scope,
+                assignedPropertyId: assignment.propertyId,
+                assignmentLabel: assignment.label,
+                badgeLogoUrl: assignment.logoUrl
             });
 
             this.saveLocalData();
@@ -1673,23 +1711,218 @@
 
         refreshTeamMemberStaffId() {
             const role = document.getElementById('teamMemberRole')?.value || 'staff';
+            const assignmentValue = document.getElementById('teamMemberAssignment')?.value || 'office:admin';
             const input = document.getElementById('teamMemberStaffId');
             if (!input) return;
 
             const prefixMap = {
                 staff: 'ops',
-                management: 'mgmt',
-                chairman: 'chair'
+                management: 'mgt',
+                chairman: 'exec'
             };
-            const prefix = prefixMap[role] || 'team';
+            const prefix = `${this.toStaffCodeFragment(this.getTeamAssignmentDetails(assignmentValue).label, 4)}-${prefixMap[role] || 'team'}`.toLowerCase();
             const existingNumbers = this.teamMembers
                 .map(member => member.staffId || '')
                 .filter(id => id.startsWith(`${prefix}-`))
-                .map(id => parseInt(id.split('-')[1], 10))
+                .map(id => parseInt(id.split('-').pop(), 10))
                 .filter(num => !isNaN(num));
             const nextNumber = (existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1;
             input.value = `${prefix}-${String(nextNumber).padStart(3, '0')}`;
             refreshFloatingLabels();
+        }
+
+        getTeamAssignmentDetails(value) {
+            if (String(value || '').startsWith('property:')) {
+                const propertyId = String(value).split(':')[1];
+                const property = this.inventory.find(item => item.id === propertyId);
+                return {
+                    scope: 'property',
+                    propertyId,
+                    label: property?.name || 'Property Desk',
+                    logoUrl: Array.isArray(property?.images) && property.images[0] ? property.images[0] : ''
+                };
+            }
+
+            if (value === 'office:executive') {
+                return {
+                    scope: 'executive',
+                    propertyId: '',
+                    label: 'Executive Office',
+                    logoUrl: ''
+                };
+            }
+
+            return {
+                scope: 'admin',
+                propertyId: '',
+                label: 'Admin Office',
+                logoUrl: ''
+            };
+        }
+
+        toStaffCodeFragment(text, maxLength = 4) {
+            const cleaned = String(text || '')
+                .toLowerCase()
+                .replace(/[^a-z0-9\s]/g, ' ')
+                .trim();
+            if (!cleaned) return 'team';
+
+            const words = cleaned.split(/\s+/).filter(Boolean);
+            if (words.length > 1) {
+                return words.map(word => word[0]).join('').slice(0, maxLength) || 'team';
+            }
+
+            return cleaned.replace(/\s+/g, '').slice(0, maxLength) || 'team';
+        }
+
+        async loadImageForCanvas(url) {
+            return await new Promise((resolve, reject) => {
+                const img = new Image();
+                img.crossOrigin = 'anonymous';
+                img.onload = () => resolve(img);
+                img.onerror = () => reject(new Error('Image failed to load'));
+                img.src = url;
+            });
+        }
+
+        async downloadTeamMemberId(id) {
+            const member = this.teamMembers.find(item => item.id === id);
+            if (!member) {
+                this.showNotification("Staff member not found.", "error");
+                return;
+            }
+
+            const width = 1200;
+            const height = 720;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+                this.showNotification("Staff ID card could not be prepared.", "error");
+                return;
+            }
+
+            const property = member.assignedPropertyId
+                ? this.inventory.find(item => item.id === member.assignedPropertyId)
+                : null;
+            const accent = member.assignmentScope === 'executive' ? '#1f7a8c' : member.assignmentScope === 'property' ? '#0f9d58' : '#ff385c';
+
+            const roundRect = (x, y, w, h, r) => {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + w - r, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+                ctx.lineTo(x + w, y + h - r);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                ctx.lineTo(x + r, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+                ctx.lineTo(x, y + r);
+                ctx.quadraticCurveTo(x, y, x + r, y);
+                ctx.closePath();
+            };
+
+            const writeText = (text, x, y, options = {}) => {
+                const {
+                    size = 28,
+                    weight = '400',
+                    color = '#111111',
+                    align = 'left',
+                    font = 'Poppins, Arial, sans-serif'
+                } = options;
+                ctx.font = `${weight} ${size}px ${font}`;
+                ctx.fillStyle = color;
+                ctx.textAlign = align;
+                ctx.fillText(String(text ?? ''), x, y);
+            };
+
+            const wrapText = (text, x, y, maxWidth, lineHeight, options = {}) => {
+                const words = String(text || '').split(/\s+/);
+                let line = '';
+                words.forEach((word, index) => {
+                    const next = line ? `${line} ${word}` : word;
+                    ctx.font = `${options.weight || '400'} ${options.size || 28}px ${options.font || 'Poppins, Arial, sans-serif'}`;
+                    if (ctx.measureText(next).width > maxWidth && line) {
+                        writeText(line, x, y, options);
+                        line = word;
+                        y += lineHeight;
+                    } else {
+                        line = next;
+                    }
+                    if (index === words.length - 1 && line) writeText(line, x, y, options);
+                });
+            };
+
+            const gradient = ctx.createLinearGradient(0, 0, width, height);
+            gradient.addColorStop(0, '#fff6f7');
+            gradient.addColorStop(0.55, '#ffffff');
+            gradient.addColorStop(1, '#fff2e8');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#ffffff';
+            roundRect(50, 50, width - 100, height - 100, 36);
+            ctx.fill();
+            ctx.strokeStyle = '#f0d8de';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            ctx.fillStyle = accent;
+            roundRect(50, 50, 360, height - 100, 36);
+            ctx.fill();
+
+            if (member.badgeLogoUrl) {
+                try {
+                    const logoImage = await this.loadImageForCanvas(member.badgeLogoUrl);
+                    ctx.save();
+                    roundRect(95, 150, 270, 240, 28);
+                    ctx.clip();
+                    ctx.drawImage(logoImage, 95, 150, 270, 240);
+                    ctx.restore();
+                } catch (error) {
+                    ctx.fillStyle = 'rgba(255,255,255,0.18)';
+                    roundRect(95, 150, 270, 240, 28);
+                    ctx.fill();
+                }
+            } else {
+                ctx.fillStyle = 'rgba(255,255,255,0.16)';
+                roundRect(95, 150, 270, 240, 28);
+                ctx.fill();
+            }
+
+            ctx.fillStyle = '#ffffff';
+            writeText('Amada', 95, 105, { size: 44, weight: '700', color: '#ffffff' });
+            writeText('Engine Staff ID', 95, 140, { size: 22, weight: '500', color: 'rgba(255,255,255,0.85)' });
+            writeText(member.assignmentLabel || 'Admin Office', 95, 455, { size: 30, weight: '700', color: '#ffffff' });
+            wrapText(property?.loc || 'Abuja, Nigeria', 95, 495, 250, 32, { size: 22, color: 'rgba(255,255,255,0.82)' });
+            writeText(member.staffId, 95, 585, { size: 32, weight: '700', color: '#ffe38a', font: 'monospace' });
+            writeText(String(member.role || '').toUpperCase(), 95, 625, { size: 22, weight: '700', color: '#ffffff' });
+
+            writeText('OFFICIAL STAFF PASS', 470, 130, { size: 18, weight: '700', color: accent });
+            wrapText(member.name, 470, 210, 600, 58, { size: 48, weight: '700', color: '#161616', font: 'Playfair Display, Georgia, serif' });
+            writeText(member.email || 'No email provided', 470, 285, { size: 24, color: '#555555' });
+
+            ctx.fillStyle = '#f8f8f8';
+            roundRect(470, 345, 620, 235, 28);
+            ctx.fill();
+            ctx.strokeStyle = '#ececec';
+            ctx.stroke();
+
+            writeText('Assigned Unit', 510, 395, { size: 18, weight: '700', color: '#888888' });
+            wrapText(member.assignmentLabel || 'Admin Office', 510, 438, 520, 42, { size: 32, weight: '700', color: '#1f1f1f' });
+            writeText('Role', 510, 505, { size: 18, weight: '700', color: '#888888' });
+            writeText(String(member.role || '').toUpperCase(), 510, 545, { size: 28, weight: '700', color: accent });
+            writeText('Issued By', 860, 505, { size: 18, weight: '700', color: '#888888' });
+            writeText(this.currentHostEmail || member.createdBy || 'Amada Host', 860, 545, { size: 24, weight: '600', color: '#1f1f1f' });
+
+            writeText('Valid for internal operations and access control only.', 470, 635, { size: 18, color: '#888888' });
+
+            const link = document.createElement('a');
+            link.download = `amada-staff-id-${member.staffId}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+            this.showNotification(`Staff ID downloaded for ${member.name}.`, "success");
         }
 
         initAddPropMap() {
