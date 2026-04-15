@@ -359,7 +359,7 @@
                     <div class="input-floating"><input type="password" id="loginPass" required><label>Password</label></div>
                 </div>
                 <div id="staffLoginFields" style="display:none;">
-                    <div class="input-floating"><input type="email" id="loginStaffId"><label>Team Email</label></div>
+                    <div class="input-floating"><input type="tel" id="loginStaffId" maxlength="11" pattern="[0-9]{11}" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)"><label>Team Phone Number</label></div>
                     <div class="input-floating"><input type="password" id="loginPin" placeholder="••••" style="text-align:center; font-size:2rem; letter-spacing:15px; padding:15px;"><label>Team Password / PIN</label></div>
                 </div>
                 <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:15px;">Authorize Access</button>
@@ -595,7 +595,7 @@
 
     <!-- Booking Modal -->
     <div id="bookingModal" class="modal">
-        <div class="modal-content">
+        <div class="modal-content booking-modal-content">
             <button class="close-modal" onclick="app.closeModal()"><i class="fa-solid fa-times"></i></button>
             <h3 style="margin-top:0; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-calendar-check" style="color:var(--primary)"></i> Secure Booking</h3>
             
@@ -604,14 +604,14 @@
                 <div style="color:var(--gray); font-size:0.95rem; margin-top:5px;" id="modalPropPrice">Price</div>
             </div>
 
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px;">
+            <div class="booking-modal-grid">
                 <div class="input-floating"><input type="date" id="checkInDate" required onchange="app.calcTotal()"><label style="top:5px; font-size:0.7rem;">Check-In</label></div>
                 <div class="input-floating"><input type="date" id="checkOutDate" required onchange="app.calcTotal()"><label style="top:5px; font-size:0.7rem;">Check-Out</label></div>
             </div>
 
             <div class="input-floating"><input type="text" id="guestName" required><label>Guest Full Name</label></div>
             
-            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom: 20px;">
+            <div class="booking-modal-grid" style="margin-bottom: 20px;">
                 <div class="input-floating">
                     <input type="tel" id="guestPhone" required maxlength="11" pattern="[0-9]{10,11}" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
                     <label>Phone No. (Max 11 digits)</label>
@@ -625,9 +625,10 @@
             <div style="background:#f8f9fa; padding:20px; border-radius:12px; margin-bottom:25px; text-align:center; border:2px dashed #ddd;">
                 <div style="font-size: 0.85rem; color: var(--gray); text-transform: uppercase; font-weight:600;">Total Estimate (<span id="nightCount">1</span> Nights)</div>
                 <div id="modalTotal" style="font-size:2.2rem; font-weight:700; color:var(--dark); margin-top:5px;">₦0</div>
+                <div id="modalChargeBreakdown" style="font-size:0.9rem; color:var(--gray); margin-top:8px;">Stay only</div>
             </div>
 
-            <div class="input-floating"><input type="text" id="cautionFeePaid" data-currency inputmode="numeric" autocomplete="off" value="0"><label>Caution Fee Paid (₦)</label></div>
+            <div class="input-floating"><input type="text" id="cautionFeePaid" data-currency inputmode="numeric" autocomplete="off" value="0" oninput="app.calcTotal()"><label>Caution Fee (₦)</label></div>
             <div class="input-floating"><input type="text" id="actualPaid" data-currency inputmode="numeric" autocomplete="off" required><label>Actual Amount Paid (₦)</label></div>
 
             <button id="btnConfirm" class="btn-primary" style="width:100%; justify-content:center;" onclick="app.confirmBooking()"><i class="fa-solid fa-lock"></i> Confirm & Generate Entry Code</button>

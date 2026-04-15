@@ -270,6 +270,7 @@
             this.chairmanLocation = 'all';
             this.managementReportType = 'expenditure';
             this.chairmanReportType = 'income';
+            this.checkedExpenseIds = new Set();
 
             this.ready = this.init();
         }
@@ -776,7 +777,8 @@
                 name: member.name,
                 role: member.role,
                 id: member.staffId,
-                email: member.email || ''
+                email: member.email || '',
+                phone: member.phone || ''
             };
 
             const existingIndex = this.teamMembers.findIndex(item => item.staffId === member.staffId);
@@ -787,7 +789,45 @@
             }
         }
 
-        async hydrateTeamMemberFromAuthUser(user, emailHint = null) {
+        getTeamAuthEmail(phone) {
+            const digits = String(phone || '').replace(/\D/g, '');
+            return digits ? `team-${digits}@amada.local` : '';
+        }
+
+        async findTeamMemberByPhone(phone) {
+            const normalizedPhone = String(phone || '').replace(/\D/g, '');
+            if (!normalizedPhone) return null;
+
+            const localMember = this.teamMembers.find(member => String(member.phone || '').replace(/\D/g, '') === normalizedPhone);
+            if (localMember) return localMember;
+
+            if (!this.supabase) return null;
+            const { data, error } = await this.supabase
+                .from('team_members')
+                .select('*, hosts!team_members_host_id_fkey(email)')
+                .eq('phone', normalizedPhone)
+                .maybeSingle();
+
+            if (error) throw error;
+            if (!data) return null;
+
+            return {
+                id: data.id,
+                name: data.full_name,
+                role: data.role,
+                staffId: data.staff_id,
+                email: data.email || '',
+                phone: data.phone || '',
+                pin: data.pin || '',
+                createdBy: data.hosts?.email || null,
+                assignmentScope: data.assignment_scope || 'admin',
+                assignedPropertyId: data.assigned_property_id || '',
+                assignmentLabel: data.assignment_label || (data.assignment_scope === 'executive' ? 'Executive Office' : 'Admin Office'),
+                badgeLogoUrl: data.badge_logo_url || ''
+            };
+        }
+
+        async hydrateTeamMemberFromAuthUser(user, emailHint = null, phoneHint = null) {
             if (!this.supabase || !user) return null;
 
             let { data: teamRow, error } = await this.supabase
@@ -797,6 +837,26 @@
                 .maybeSingle();
 
             if (error) throw error;
+
+            const normalizedPhone = String(phoneHint || user.phone || user.user_metadata?.phone || '').replace(/\D/g, '');
+            if (!teamRow && normalizedPhone) {
+                const { error: claimError } = await this.supabase
+                    .from('team_members')
+                    .update({ auth_user_id: user.id })
+                    .eq('phone', normalizedPhone)
+                    .is('auth_user_id', null);
+
+                if (claimError) throw claimError;
+
+                const claimed = await this.supabase
+                    .from('team_members')
+                    .select('*, hosts!team_members_host_id_fkey(email)')
+                    .eq('auth_user_id', user.id)
+                    .maybeSingle();
+
+                if (claimed.error) throw claimed.error;
+                teamRow = claimed.data;
+            }
 
             const normalizedEmail = String(emailHint || user.email || '').trim().toLowerCase();
             if (!teamRow && normalizedEmail) {
@@ -844,7 +904,7 @@
                 if (!user) return null;
                 const host = await this.hydrateHostFromAuthUser(user, user.email);
                 if (host) return host;
-                return await this.hydrateTeamMemberFromAuthUser(user, user.email);
+                return await this.hydrateTeamMemberFromAuthUser(user, user.email, user.phone || user.user_metadata?.phone);
             } catch (e) {
                 console.warn('Could not restore authenticated session:', e);
                 this.authUser = null;
@@ -1431,9 +1491,14 @@
         }
         
         async loginStaff(identifier, pin) {
-            const normalizedEmail = (identifier || '').trim().toLowerCase();
-            if (!normalizedEmail || !pin) {
-                this.showNotification("Enter your team email and password.", "error");
+            const normalizedPhone = String(identifier || '').replace(/\D/g, '');
+            if (!normalizedPhone || !pin) {
+                this.showNotification("Enter your team phone number and password.", "error");
+                return;
+            }
+
+            if (!/^\d{11}$/.test(normalizedPhone)) {
+                this.showNotification("Enter a valid 11-digit team phone number.", "error");
                 return;
             }
 
@@ -1442,17 +1507,28 @@
                 return;
             }
 
+            const memberProfile = await this.findTeamMemberByPhone(normalizedPhone);
+            if (!memberProfile) {
+                this.showNotification("No team member was found for that phone number.", "error");
+                return;
+            }
+
+            const authEmail = memberProfile.email || this.getTeamAuthEmail(normalizedPhone);
             let authResult = await this.supabase.auth.signInWithPassword({
-                email: normalizedEmail,
+                email: authEmail,
                 password: pin
             });
 
             if (authResult.error || !authResult.data.user) {
                 const signUpResult = await this.supabase.auth.signUp({
-                    email: normalizedEmail,
+                    email: authEmail,
                     password: pin,
                     options: {
-                        emailRedirectTo: this.getAuthRedirectUrl()
+                        emailRedirectTo: this.getAuthRedirectUrl(),
+                        data: {
+                            phone: normalizedPhone,
+                            full_name: memberProfile.name || ''
+                        }
                     }
                 });
 
@@ -1470,7 +1546,7 @@
             }
 
             this.authUser = authResult.data.user;
-            const member = await this.hydrateTeamMemberFromAuthUser(authResult.data.user, normalizedEmail);
+            const member = await this.hydrateTeamMemberFromAuthUser(authResult.data.user, authEmail, normalizedPhone);
             if (!member) {
                 this.showNotification("Team profile not found for this authenticated account.", "error");
                 return;
@@ -1613,7 +1689,8 @@
                                     <label style="top:5px; font-size:0.7rem;">Assign To</label>
                                 </div>
                                 <div class="input-floating"><input type="text" id="teamMemberStaffId" readonly required><label>Staff ID</label></div>
-                                <div class="input-floating"><input type="email" id="teamMemberEmail" required><label>Email Address</label></div>
+                                <div class="input-floating"><input type="tel" id="teamMemberPhone" required maxlength="11" pattern="[0-9]{11}" title="Please enter exactly 11 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)"><label>Phone Number</label></div>
+                                <div class="input-floating"><input type="email" id="teamMemberEmail"><label>Email Address (Optional)</label></div>
                                 <div class="input-floating"><input type="password" id="teamMemberPin" required><label>Access PIN</label></div>
                             </div>
                             <button class="btn-primary" style="margin-top:10px; justify-content:center;">
@@ -1625,7 +1702,7 @@
                                 <div style="display:flex; justify-content:space-between; gap:16px; align-items:center; padding:18px 20px; border-bottom:1px solid #eee;">
                                     <div>
                                         <div style="font-weight:700;">${member.name}</div>
-                                        <div style="font-size:0.84rem; color:var(--gray);">${member.role.toUpperCase()} • ${member.staffId}${member.email ? ` • ${member.email}` : ''}</div>
+                                        <div style="font-size:0.84rem; color:var(--gray);">${member.role.toUpperCase()} • ${member.staffId} • ${member.phone || 'No phone'}${member.email ? ` • ${member.email}` : ''}</div>
                                         <div style="font-size:0.8rem; color:var(--gray); margin-top:4px;">Assigned to ${member.assignmentLabel || 'Admin Office'}</div>
                                     </div>
                                     <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -1665,21 +1742,29 @@
             const role = document.getElementById('teamMemberRole').value;
             const assignmentValue = document.getElementById('teamMemberAssignment').value;
             const staffId = document.getElementById('teamMemberStaffId').value.trim();
+            const phone = document.getElementById('teamMemberPhone').value.trim();
             const email = document.getElementById('teamMemberEmail').value.trim();
             const pin = document.getElementById('teamMemberPin').value.trim();
             const assignment = this.getTeamAssignmentDetails(assignmentValue);
 
-            if (!name || !role || !assignmentValue || !staffId || !email || !pin) {
+            if (!name || !role || !assignmentValue || !staffId || !phone || !pin) {
                 this.showNotification("Complete the team access form before saving.", "error");
+                return;
+            }
+
+            if (!/^\d{11}$/.test(phone)) {
+                this.showNotification("Enter a valid 11-digit phone number.", "error");
+                document.getElementById('teamMemberPhone')?.focus();
                 return;
             }
 
             const duplicate = this.teamMembers.find(member =>
                 member.staffId.toLowerCase() === staffId.toLowerCase() ||
+                (phone && member.phone && member.phone === phone) ||
                 (email && member.email && member.email.toLowerCase() === email.toLowerCase())
             );
             if (duplicate) {
-                this.showNotification("That staff ID or email already has access.", "error");
+                this.showNotification("That staff ID, phone number, or email already has access.", "error");
                 return;
             }
 
@@ -1688,6 +1773,7 @@
                 name,
                 role,
                 staffId,
+                phone,
                 email,
                 pin,
                 createdBy: this.currentHostEmail,
@@ -1775,6 +1861,13 @@
             return cleaned.replace(/\s+/g, '').slice(0, maxLength) || 'team';
         }
 
+        getHostNameByEmail(email) {
+            const normalizedEmail = String(email || '').trim().toLowerCase();
+            if (!normalizedEmail) return '';
+            const host = this.hosts.find(item => String(item.email || '').trim().toLowerCase() === normalizedEmail);
+            return String(host?.name || '').trim();
+        }
+
         async loadImageForCanvas(url) {
             return await new Promise((resolve, reject) => {
                 const img = new Image();
@@ -1808,6 +1901,11 @@
                 ? this.inventory.find(item => item.id === member.assignedPropertyId)
                 : null;
             const accent = member.assignmentScope === 'executive' ? '#1f7a8c' : member.assignmentScope === 'property' ? '#0f9d58' : '#ff385c';
+            const issuerName = this.getHostNameByEmail(member.createdBy) ||
+                this.getHostNameByEmail(this.currentHostEmail) ||
+                member.createdBy ||
+                this.currentHostEmail ||
+                'Amada Host';
 
             const roundRect = (x, y, w, h, r) => {
                 ctx.beginPath();
@@ -1901,6 +1999,7 @@
 
             writeText('OFFICIAL STAFF PASS', 470, 130, { size: 18, weight: '700', color: accent });
             wrapText(member.name, 470, 210, 600, 58, { size: 48, weight: '700', color: '#161616', font: 'Playfair Display, Georgia, serif' });
+            writeText(member.phone || 'No phone provided', 470, 250, { size: 24, color: '#555555' });
             writeText(member.email || 'No email provided', 470, 285, { size: 24, color: '#555555' });
 
             ctx.fillStyle = '#f8f8f8';
@@ -1914,7 +2013,7 @@
             writeText('Role', 510, 505, { size: 18, weight: '700', color: '#888888' });
             writeText(String(member.role || '').toUpperCase(), 510, 545, { size: 28, weight: '700', color: accent });
             writeText('Issued By', 860, 505, { size: 18, weight: '700', color: '#888888' });
-            writeText(this.currentHostEmail || member.createdBy || 'Amada Host', 860, 545, { size: 24, weight: '600', color: '#1f1f1f' });
+            writeText(issuerName, 860, 545, { size: 24, weight: '600', color: '#1f1f1f' });
 
             writeText('Valid for internal operations and access control only.', 470, 635, { size: 18, color: '#888888' });
 
@@ -2970,7 +3069,7 @@
                 location: prop?.loc || '',
                 checkIn: tx.checkIn || '',
                 checkOut: tx.checkOut || '',
-                total: totalPaid,
+                total: estimatedTotal,
                 estimatedTotal,
                 totalPaid,
                 balance: Math.max(0, estimatedTotal - totalPaid),
@@ -3340,9 +3439,15 @@
                                 <div style="font-size:0.85rem; color:var(--gray);">${exp.scope} • ${exp.category} • ${exp.date}</div>
                                 <div style="font-size:0.8rem; color:var(--gray);">Submitted by ${exp.requestedBy || exp.staffId}</div>
                             </div>
-                            <div style="text-align:right;">
+                            <div style="text-align:right; display:flex; align-items:center; gap:12px;">
+                                <label style="display:flex; align-items:center; gap:8px; color:var(--gray); font-size:0.84rem; cursor:pointer;">
+                                    <input type="checkbox" ${this.isExpenseChecked(exp.id) ? 'checked' : ''} onchange="app.toggleExpenseChecked('${exp.id}', this.checked)" style="accent-color: var(--primary);">
+                                    Check
+                                </label>
+                                <div>
                                 <strong>${this.formatCurrency(exp.amount)}</strong>
                                 <div style="font-size:0.8rem; color:${exp.status === 'Approved for chairman' ? 'var(--success)' : 'var(--warning)'}; margin-top:6px;">${exp.status || 'Pending approval'}</div>
+                                </div>
                             </div>
                         </div>
                     `).join('')}
@@ -3443,6 +3548,27 @@
             return new Set(this.getScopedInventoryRecords().map(item => item.loc));
         }
 
+        getCurrentTeamMemberRecord() {
+            if (!this.currentUser || this.role === 'host') return null;
+            return this.teamMembers.find(member =>
+                member.staffId === this.currentUser.id ||
+                (member.phone && member.phone === this.currentUser.phone) ||
+                (member.email && member.email === this.currentUser.email)
+            ) || null;
+        }
+
+        getMapInventoryRecords(elementId) {
+            if (elementId === 'guestMapArea') return this.inventory;
+            const scopedInventory = this.getScopedInventoryRecords();
+            if (elementId === 'staffMap') {
+                const member = this.getCurrentTeamMemberRecord();
+                if (member?.assignmentScope === 'property' && member.assignedPropertyId) {
+                    return scopedInventory.filter(item => item.id === member.assignedPropertyId);
+                }
+            }
+            return scopedInventory;
+        }
+
         getFilteredTransactions(from, to, location) {
             const scopedPropertyIds = this.getScopedPropertyIds();
             return this.transactions.filter(tx => {
@@ -3504,7 +3630,9 @@
             }
 
             const member = this.teamMembers.find(member =>
-                member.staffId === this.currentUser.id || member.email === this.currentUser.email
+                member.staffId === this.currentUser.id ||
+                (member.phone && member.phone === this.currentUser.phone) ||
+                (member.email && member.email === this.currentUser.email)
             );
             if (!member) return null;
             return {
@@ -3525,6 +3653,29 @@
             return 'Global Ops';
         }
 
+        getReportingRentAmount(entry, from, to) {
+            const annualRent = Number(entry?.amount) || 0;
+            if (!annualRent) return 0;
+            if (!from || !to) return annualRent / 12;
+
+            const fromDate = new Date(from);
+            const toDate = new Date(to);
+            if (isNaN(fromDate) || isNaN(toDate) || toDate < fromDate) return annualRent / 12;
+
+            const isWholeMonthRange =
+                fromDate.getDate() === 1 &&
+                toDate.getDate() === new Date(toDate.getFullYear(), toDate.getMonth() + 1, 0).getDate();
+
+            if (isWholeMonthRange) {
+                const monthCount = ((toDate.getFullYear() - fromDate.getFullYear()) * 12) + (toDate.getMonth() - fromDate.getMonth()) + 1;
+                return (annualRent / 12) * Math.max(monthCount, 1);
+            }
+
+            const oneDay = 86400000;
+            const dayCount = Math.floor((toDate - fromDate) / oneDay) + 1;
+            return (annualRent / 365) * Math.max(dayCount, 1);
+        }
+
         getBaselineTotals(location, from, to) {
             const scopedLocations = this.getScopedLocationsSet();
             const salaries = this.salaryRegistry
@@ -3534,7 +3685,7 @@
             const rent = this.rentRegistry
                 .filter(entry => !this.isHostDelegatedView() || scopedLocations.has(entry.location))
                 .filter(entry => location === 'all' || entry.location === location)
-                .reduce((sum, entry) => sum + (entry.amount || 0), 0);
+                .reduce((sum, entry) => sum + this.getReportingRentAmount(entry, from, to), 0);
             const sundry = this.expenditures
                 .filter(entry => entry.status === 'Approved for chairman')
                 .filter(entry => this.isDateInRange(entry.approvedAt || entry.date, from, to))
@@ -3542,6 +3693,17 @@
                 .filter(entry => location === 'all' || entry.scope === location)
                 .reduce((sum, entry) => sum + (entry.amount || 0), 0);
             return { salary: salaries, sundry, rent };
+        }
+
+        isExpenseChecked(id) {
+            return this.checkedExpenseIds.has(id);
+        }
+
+        toggleExpenseChecked(id, checked) {
+            if (!id) return;
+            if (checked) this.checkedExpenseIds.add(id);
+            else this.checkedExpenseIds.delete(id);
+            this.render();
         }
 
         getExecutiveMetrics(from, to, location) {
@@ -4178,7 +4340,7 @@
                                 <div style="display:flex; flex-direction:column; gap:18px; margin-top:24px;">
                                     <div style="display:flex; justify-content:space-between; gap:15px;"><span style="color:var(--gray);"><i class="fa-solid fa-users" style="margin-right:8px;"></i>Salaries (Allocated)</span><strong>${this.formatCurrency(metrics.baselines.salary)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; gap:15px;"><span style="color:var(--gray);"><i class="fa-solid fa-toolbox" style="margin-right:8px;"></i>Sundry (Approved Expenses)</span><strong>${this.formatCurrency(metrics.recordedExpenses)}</strong></div>
-                                    <div style="display:flex; justify-content:space-between; gap:15px;"><span style="color:var(--gray);"><i class="fa-solid fa-building" style="margin-right:8px;"></i>Rent</span><strong>${this.formatCurrency(metrics.baselines.rent)}</strong></div>
+                                    <div style="display:flex; justify-content:space-between; gap:15px;"><span style="color:var(--gray);"><i class="fa-solid fa-building" style="margin-right:8px;"></i>Rent (Allocated)</span><strong>${this.formatCurrency(metrics.baselines.rent)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; gap:15px; padding-top:12px; border-top:1px dashed #ddd;"><span style="color:var(--gray);"><i class="fa-solid fa-calendar-check" style="margin-right:8px;"></i>Booking Revenue</span><strong>${this.formatCurrency(metrics.bookingRevenue)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; gap:15px;"><span style="color:var(--gray);"><i class="fa-solid fa-utensils" style="margin-right:8px;"></i>Other Income</span><strong>${this.formatCurrency(metrics.otherIncome)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; gap:15px;"><span style="color:var(--gray);"><i class="fa-solid fa-bolt" style="margin-right:8px;"></i>Average Booking Ticket</span><strong>${this.formatCurrency(metrics.avgDailyRate)}</strong></div>
@@ -4194,7 +4356,7 @@
                                     <div style="display:flex; justify-content:space-between; padding:14px 0; border-top:1px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.12);"><span style="font-weight:700;">Net Revenue</span><strong>${this.formatCurrency(metrics.netRevenue)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: VAT (12.5%)</span><strong>-${this.formatCurrency(metrics.vat)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Maint (5%)</span><strong>-${this.formatCurrency(metrics.maintenance)}</strong></div>
-                                    <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Rent</span><strong>-${this.formatCurrency(metrics.baselines.rent)}</strong></div>
+                                    <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Rent (Allocated)</span><strong>-${this.formatCurrency(metrics.baselines.rent)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Total Sundry</span><strong>-${this.formatCurrency(metrics.recordedExpenses)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Salaries</span><strong>-${this.formatCurrency(metrics.baselines.salary)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; margin-top:12px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.15); font-size:1.05rem;"><span style="font-weight:700;">Operating Profit / Loss</span><strong style="color:${metrics.operatingProfit >= 0 ? '#7ED957' : '#FF8B8B'}">${this.formatCurrency(metrics.operatingProfit)}</strong></div>
@@ -4270,9 +4432,15 @@
                                             <strong>${this.currentUser?.name || 'current management user'}</strong>
                                             ${this.currentUser?.id ? `(${this.currentUser.id})` : ''}.
                                         </div>
-                                        <button class="btn-primary" onclick="app.approveExpenseRequest('${exp.id}')" style="height:52px; justify-content:center;">
-                                            <i class="fa-solid fa-badge-check"></i> Approve
-                                        </button>
+                                        <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+                                            <label style="display:flex; align-items:center; gap:8px; color:var(--gray); font-size:0.84rem; cursor:pointer;">
+                                                <input type="checkbox" ${this.isExpenseChecked(exp.id) ? 'checked' : ''} onchange="app.toggleExpenseChecked('${exp.id}', this.checked)" style="accent-color: var(--primary);">
+                                                Check
+                                            </label>
+                                            <button class="btn-primary" onclick="app.approveExpenseRequest('${exp.id}')" style="height:52px; justify-content:center;">
+                                                <i class="fa-solid fa-badge-check"></i> Approve
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             `).join('')}
@@ -4303,9 +4471,15 @@
                                         <div style="font-size:0.85rem; color:var(--gray);">${exp.scope} • ${exp.category} • ${exp.date}</div>
                                         <div style="font-size:0.8rem; color:var(--gray);">Requested by ${exp.requestedBy || exp.staffId} • Approved by ${exp.approver || 'Pending'}</div>
                                     </div>
-                                    <div style="text-align:right;">
+                                    <div style="text-align:right; display:flex; align-items:center; gap:12px;">
+                                        <label style="display:flex; align-items:center; gap:8px; color:var(--gray); font-size:0.84rem; cursor:pointer;">
+                                            <input type="checkbox" ${this.isExpenseChecked(exp.id) ? 'checked' : ''} onchange="app.toggleExpenseChecked('${exp.id}', this.checked)" style="accent-color: var(--primary);">
+                                            Check
+                                        </label>
+                                        <div>
                                         <strong>${this.formatCurrency(exp.amount)}</strong>
                                         <div style="font-size:0.8rem; color:${exp.status === 'Approved for chairman' ? 'var(--success)' : 'var(--warning)'}; margin-top:6px;">${exp.status || 'Pending approval'}</div>
+                                        </div>
                                     </div>
                                 </div>
                             `).join('')}
@@ -4371,14 +4545,14 @@
                                             </select>
                                             <label style="top:5px; font-size:0.7rem;">Location</label>
                                         </div>
-                                        <div class="input-floating"><input type="text" id="rentAmount" value="${this.formatCurrencyInputValue(editingRent?.amount || '')}" data-currency inputmode="numeric" autocomplete="off" required><label>Rent Amount (₦)</label></div>
+                                        <div class="input-floating"><input type="text" id="rentAmount" value="${this.formatCurrencyInputValue(editingRent?.amount || '')}" data-currency inputmode="numeric" autocomplete="off" required><label>Annual Rent (₦)</label></div>
                                     </div>
                                     <button class="btn-primary" style="margin-top:10px; justify-content:center;">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i> ${editingRent ? 'Update Rent' : 'Save Rent'}
+                                        <i class="fa-solid fa-cloud-arrow-up"></i> ${editingRent ? 'Update Annual Rent' : 'Save Annual Rent'}
                                     </button>
                                 </form>
                                 <div style="margin-top:20px; border-top:1px solid #eee; padding-top:16px;">
-                                    <div style="font-size:0.9rem; color:var(--gray); margin-bottom:12px;">Current Total Rent</div>
+                                    <div style="font-size:0.9rem; color:var(--gray); margin-bottom:12px;">Allocated Rent For Selected Period</div>
                                     <div style="font-size:2rem; font-weight:700;">${this.formatCurrency(metrics.baselines.rent)}</div>
                                 </div>
                             </div>
@@ -4406,7 +4580,7 @@
                                 <div style="display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #eee;">
                                     <div style="font-weight:600;">${entry.location}</div>
                                     <div style="display:flex; gap:12px; align-items:center;">
-                                        <strong>${this.formatCurrency(entry.amount)}</strong>
+                                        <strong>${this.formatCurrency(entry.amount)} / year</strong>
                                         <button class="btn-outline" onclick="app.startEditRentEntry('${entry.location}')"><i class="fa-solid fa-pen"></i></button>
                                     </div>
                                 </div>
@@ -4528,7 +4702,7 @@
                             <div style="display:flex; justify-content:space-between; padding:14px 0; border-top:1px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.12);"><span style="font-weight:700;">Net Revenue</span><strong>${this.formatCurrency(metrics.netRevenue)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: VAT (12.5%)</span><strong>-${this.formatCurrency(metrics.vat)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Maint (5%)</span><strong>-${this.formatCurrency(metrics.maintenance)}</strong></div>
-                            <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Rent</span><strong>-${this.formatCurrency(metrics.baselines.rent)}</strong></div>
+                            <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Rent (Allocated)</span><strong>-${this.formatCurrency(metrics.baselines.rent)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Total Sundry</span><strong>-${this.formatCurrency(metrics.recordedExpenses)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Salaries</span><strong>-${this.formatCurrency(metrics.baselines.salary)}</strong></div>
                             <div style="display:flex; justify-content:space-between; margin-top:12px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.15); font-size:1.05rem;"><span style="font-weight:700;">Operating Profit / Loss</span><strong style="color:${metrics.operatingProfit >= 0 ? '#7ED957' : '#FF8B8B'}">${this.formatCurrency(metrics.operatingProfit)}</strong></div>
@@ -4568,6 +4742,7 @@
                                             <th style="padding:12px; text-align:left;">Location</th>
                                             <th style="padding:12px; text-align:left;">Requested By</th>
                                             <th style="padding:12px; text-align:left;">Approved By</th>
+                                            <th style="padding:12px; text-align:center;">Check</th>
                                             <th style="padding:12px; text-align:right;">Amount</th>
                                         </tr>
                                     </thead>
@@ -4579,6 +4754,7 @@
                                                 <td style="padding:12px;">${exp.scope}</td>
                                                 <td style="padding:12px;">${exp.requestedBy || exp.staffId}</td>
                                                 <td style="padding:12px;">${exp.approver || '-'}</td>
+                                                <td style="padding:12px; text-align:center;"><input type="checkbox" ${this.isExpenseChecked(exp.id) ? 'checked' : ''} onchange="app.toggleExpenseChecked('${exp.id}', this.checked)" style="accent-color: var(--primary);"></td>
                                                 <td style="padding:12px; text-align:right; font-weight:700;">${this.formatCurrency(exp.amount)}</td>
                                             </tr>
                                         `).join('')}
@@ -4880,8 +5056,16 @@
             const nights = Math.max(1, Math.ceil((d2 - d1) / 86400000));
             document.getElementById('nightCount').innerText = isNaN(nights) ? 1 : nights;
             const p = this.inventory.find(i => i.id === this.activeModalPropId);
-            const total = (p ? p.price : 0) * (isNaN(nights) ? 1 : nights);
+            const cautionFee = this.parseCurrencyValue(document.getElementById('cautionFeePaid')?.value) || 0;
+            const stayTotal = (p ? p.price : 0) * (isNaN(nights) ? 1 : nights);
+            const total = stayTotal + cautionFee;
             document.getElementById('modalTotal').innerText = this.formatCurrency(total);
+            const breakdown = document.getElementById('modalChargeBreakdown');
+            if (breakdown) {
+                breakdown.innerText = cautionFee > 0
+                    ? `Stay ${this.formatCurrency(stayTotal)} + caution ${this.formatCurrency(cautionFee)}`
+                    : `Stay ${this.formatCurrency(stayTotal)}`;
+            }
             this.setCurrencyInputValue('actualPaid', total);
         }
 
@@ -4901,7 +5085,13 @@
             const email = document.getElementById('guestEmail').value;
             const checkIn = document.getElementById('checkInDate').value;
             const checkOut = document.getElementById('checkOutDate').value;
-            const estimatedTotal = this.parseCurrencyValue(document.getElementById('modalTotal').innerText);
+            const stayTotal = (() => {
+                const checkInDate = new Date(checkIn);
+                const checkOutDate = new Date(checkOut);
+                const nights = Math.max(1, Math.ceil((checkOutDate - checkInDate) / 86400000));
+                return (p ? p.price : 0) * (isNaN(nights) ? 1 : nights);
+            })();
+            const estimatedTotal = stayTotal + cautionFee;
 
             if(!p || !guest || !phone || isNaN(paid)) {
                  this.showNotification("Please fill in all required details (Name, Phone, Amount)", "error"); return;
@@ -4989,8 +5179,8 @@
                 iconSize: [25, 41], iconAnchor: [12, 41], popupAnchor: [1, -34]
             });
 
-            // Put a marker for every property currently loaded in inventory
-            this.inventory.forEach(p => {
+            // Put markers only for the properties visible to the current map context
+            this.getMapInventoryRecords(elementId).forEach(p => {
                 if(p.coords && !isNaN(parseFloat(p.coords.lat)) && !isNaN(parseFloat(p.coords.lng))) {
                     // Small jitter to prevent perfectly overlapping pins
                     const jitterLat = parseFloat(p.coords.lat) + (Math.random() - 0.5) * 0.001;
