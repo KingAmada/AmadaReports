@@ -3977,8 +3977,8 @@
                         </div>
                         <div class="guest-exclusive-card-meta mb-5 mt-auto">
                             <div class="flex justify-between text-[10px] font-black uppercase text-gray-500 mb-1">
-                                <span>Availability</span>
-                                <span class="${meta.bookedPct > 85 ? 'text-amada-red' : 'text-yellow-600'}">${meta.bookedPct}% Booked</span>
+                                <span>Repeated Booking Rate</span>
+                                <span class="${meta.bookedPct > 85 ? 'text-amada-red' : 'text-yellow-600'}">${meta.bookedPct}%</span>
                             </div>
                             <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
                                 <div class="${meta.bookedPct > 85 ? 'shimmer-bg animate-shimmer' : 'bg-yellow-500'} h-1.5 rounded-full" style="width: ${meta.bookedPct}%"></div>
