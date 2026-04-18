@@ -3520,6 +3520,112 @@
             link.click();
         }
 
+        async downloadRewardReceiptImage(data) {
+            const width = 1200;
+            const height = 1500;
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+
+            if (!ctx) {
+                this.showNotification("Reward receipt could not be prepared.", "error");
+                return;
+            }
+
+            const radiusRect = (x, y, w, h, r, fill) => {
+                ctx.beginPath();
+                ctx.moveTo(x + r, y);
+                ctx.lineTo(x + w - r, y);
+                ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+                ctx.lineTo(x + w, y + h - r);
+                ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+                ctx.lineTo(x + r, y + h);
+                ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+                ctx.lineTo(x, y + r);
+                ctx.quadraticCurveTo(x, y, x + r, y);
+                ctx.closePath();
+                if (fill) ctx.fill();
+            };
+
+            const writeText = (text, x, y, options = {}) => {
+                const {
+                    size = 34,
+                    weight = '400',
+                    color = '#1a1a1a',
+                    align = 'left',
+                    font = 'Poppins, Arial, sans-serif'
+                } = options;
+                ctx.font = `${weight} ${size}px ${font}`;
+                ctx.fillStyle = color;
+                ctx.textAlign = align;
+                ctx.fillText(String(text ?? ''), x, y);
+            };
+
+            ctx.fillStyle = '#f5f5f5';
+            ctx.fillRect(0, 0, width, height);
+
+            ctx.fillStyle = '#ffffff';
+            radiusRect(70, 70, 1060, 1360, 36, true);
+
+            writeText('Amada Stays', 130, 170, { size: 54, weight: '700', color: '#ff385c' });
+            writeText('Reward Receipt', 130, 220, { size: 24, color: '#666666' });
+
+            ctx.fillStyle = '#fff0f3';
+            radiusRect(845, 110, 195, 58, 29, true);
+            writeText('REWARD CONFIRMED', 942, 148, { size: 18, weight: '700', color: '#ff385c', align: 'center' });
+            writeText(`Reference: ${data.rewardReceiptNumber}`, 1040, 210, { size: 22, color: '#666666', align: 'right' });
+            writeText(data.date || '', 1040, 245, { size: 22, color: '#666666', align: 'right' });
+
+            ctx.fillStyle = '#fafafa';
+            radiusRect(120, 290, 960, 220, 28, true);
+            ctx.strokeStyle = '#eeeeee';
+            ctx.lineWidth = 2;
+            radiusRect(120, 290, 960, 220, 28, false);
+            ctx.stroke();
+
+            writeText('GUEST', 160, 350, { size: 18, weight: '700', color: '#777777' });
+            writeText(data.guest, 160, 392, { size: 34, weight: '700' });
+            writeText('PHONE', 1040, 350, { size: 18, weight: '700', color: '#777777', align: 'right' });
+            writeText(data.phone, 1040, 392, { size: 30, weight: '700', align: 'right' });
+            writeText('PROPERTY', 160, 465, { size: 18, weight: '700', color: '#777777' });
+            writeText(data.property, 160, 507, { size: 34, weight: '700' });
+
+            ctx.fillStyle = '#fff7df';
+            radiusRect(120, 560, 960, 300, 28, true);
+            ctx.strokeStyle = '#f2d081';
+            ctx.lineWidth = 2;
+            radiusRect(120, 560, 960, 300, 28, false);
+            ctx.stroke();
+
+            writeText('UNLOCKED REWARD', 160, 625, { size: 18, weight: '700', color: '#8a5a00' });
+            writeText(data.reward.label, 160, 700, { size: 56, weight: '700', color: '#1a1a1a' });
+            writeText(data.reward.detail || '', 160, 760, { size: 28, color: '#6d6257' });
+            writeText('Valid for this confirmed booking only.', 160, 820, { size: 24, weight: '700', color: '#8a5a00' });
+
+            ctx.fillStyle = '#1a1a1a';
+            radiusRect(120, 910, 960, 240, 28, true);
+            writeText('CLAIM CODE', 600, 985, { size: 20, weight: '700', color: '#aaaaaa', align: 'center' });
+            writeText(data.code || 'N/A', 600, 1085, { size: 76, weight: '700', color: '#ffd700', align: 'center', font: 'monospace' });
+            writeText('Present this reward receipt with your claim code at check-in.', 600, 1145, { size: 24, color: '#888888', align: 'center' });
+
+            ctx.fillStyle = '#fafafa';
+            radiusRect(120, 1195, 960, 150, 28, true);
+            ctx.strokeStyle = '#eeeeee';
+            ctx.lineWidth = 2;
+            radiusRect(120, 1195, 960, 150, 28, false);
+            ctx.stroke();
+            writeText('CHECK-IN', 160, 1255, { size: 18, weight: '700', color: '#777777' });
+            writeText(data.checkIn || 'N/A', 160, 1297, { size: 30, weight: '700' });
+            writeText('CHECK-OUT', 1040, 1255, { size: 18, weight: '700', color: '#777777', align: 'right' });
+            writeText(data.checkOut || 'N/A', 1040, 1297, { size: 30, weight: '700', align: 'right' });
+
+            const link = document.createElement('a');
+            link.download = `amada-reward-${data.rewardReceiptNumber}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        }
+
         downloadCurrentReceipt() {
             if (!this.currentReceiptData) {
                 this.showNotification("No receipt available to download.", "error");
@@ -3800,9 +3906,7 @@
             return [
                 { text: 'Free Night', icon: 'fa-moon', cls: 'bg-purple-50 text-purple-700 border border-purple-200' },
                 { text: '50% Off', icon: 'fa-tags', cls: 'bg-red-50 text-amada-red border border-red-200' },
-                { text: 'Free Rides', icon: 'fa-car-side', cls: 'bg-sky-50 text-sky-700 border border-sky-200' },
-                { text: 'Free Lunch', icon: 'fa-utensils', cls: 'bg-yellow-50 text-yellow-700 border border-yellow-200' },
-                { text: 'Late Checkout', icon: 'fa-clock', cls: 'bg-green-50 text-green-700 border border-green-200' }
+                { text: 'Free Lunch', icon: 'fa-utensils', cls: 'bg-yellow-50 text-yellow-700 border border-yellow-200' }
             ];
         }
 
@@ -3867,8 +3971,6 @@
                         </div>
                         <p class="guest-exclusive-card-location text-gray-500 text-sm mb-4 font-medium">${prop.loc} • ${Math.max(2, roomsToGuests(meta.rooms))} Guests • ${roomsLabel(meta.rooms)}</p>
                         <div class="guest-exclusive-card-perks flex flex-wrap gap-2 mb-4">
-                            <span class="bg-green-50 text-xs text-green-700 font-bold px-2.5 py-1 rounded border border-green-200"><i class="fa-solid fa-rotate-left mr-1"></i> 100% Refundable</span>
-                            <span class="bg-blue-50 text-xs text-blue-700 font-bold px-2.5 py-1 rounded border border-blue-200"><i class="fa-solid fa-shield-halved mr-1"></i> Free Protection</span>
                             ${promoPerks.map(perk => `
                                 <span class="${perk.cls} text-xs font-bold px-2.5 py-1 rounded"><i class="fa-solid ${perk.icon} mr-1"></i> ${perk.text}</span>
                             `).join('')}
@@ -3891,7 +3993,7 @@
                         </div>
                     </div>
                     <div class="${meta.bookedPct > 85 ? 'bg-red-50 text-amada-red border-red-100' : 'bg-gray-50 text-gray-600 border-gray-200'} text-xs text-center py-2.5 font-bold border-t uppercase tracking-wide">
-                        <i class="fa-solid ${meta.bookedPct > 85 ? 'fa-eye animate-pulse' : 'fa-clock'} mr-1"></i> ${meta.bookedPct > 85 ? `${meta.viewers} people are viewing this right now` : 'Last booked recently'}
+                        <i class="fa-solid ${meta.bookedPct > 85 ? 'fa-eye animate-pulse' : 'fa-clock'} mr-1"></i> ${meta.bookedPct > 85 ? `${meta.viewers} people are viewing this right now` : 'Frequently booked'}
                     </div>
                 `;
                 container.appendChild(card);
@@ -4230,13 +4332,11 @@
         }
 
         prepareExclusiveSpinPrizes() {
-            let active = this.exclusivePerkPrizeDefinitions
+            const vipActive = this.exclusivePerkPrizeDefinitions
                 .filter((_, index) => !this.exclusivePerkLost[index])
                 .map(item => ({ ...item }));
-
-            if (!active.length) {
-                active = this.exclusiveBasicPerkPrizeDefinitions.map(item => ({ ...item }));
-            }
+            const basicActive = this.exclusiveBasicPerkPrizeDefinitions.map(item => ({ ...item }));
+            const active = [...vipActive, ...basicActive];
 
             this.exclusiveActiveSpinPrizes = active;
 
@@ -4898,7 +4998,18 @@
                 this.showNotification('No reward receipt is available to download.', 'error');
                 return;
             }
-            this.downloadReceiptImage(this.getTransactionReceiptData(tx));
+            const receiptData = this.getTransactionReceiptData(tx);
+            this.downloadRewardReceiptImage({
+                rewardReceiptNumber: `RW-${receiptData.receiptNumber}`,
+                date: receiptData.date,
+                guest: receiptData.guest,
+                phone: receiptData.phone,
+                property: receiptData.property,
+                checkIn: receiptData.checkIn,
+                checkOut: receiptData.checkOut,
+                code: receiptData.code,
+                reward: receiptData.reward
+            });
         }
 
         closeExclusivePrizeModal() {
