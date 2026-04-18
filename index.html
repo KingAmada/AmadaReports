@@ -23,10 +23,60 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <!-- Libraries -->
+    <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif']
+                    },
+                    colors: {
+                        amada: {
+                            red: '#D32F2F',
+                            dark: '#111111',
+                            gold: '#D4AF37',
+                            light: '#FFFFFF',
+                            gray: '#F3F4F6'
+                        }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide-in': 'slideIn 0.5s ease-out forwards',
+                        'slide-out': 'slideOut 0.5s ease-in forwards',
+                        'float': 'float 3s ease-in-out infinite',
+                        'shimmer': 'shimmer 2s linear infinite'
+                    },
+                    keyframes: {
+                        slideIn: {
+                            '0%': { transform: 'translateX(-100%)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' }
+                        },
+                        slideOut: {
+                            '0%': { transform: 'translateX(0)', opacity: '1' },
+                            '100%': { transform: 'translateX(-100%)', opacity: '0' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' }
+                        }
+                    }
+                }
+            }
+        };
+    </script>
 
     <link rel="stylesheet" href="styles.css">
 </head>
@@ -204,112 +254,430 @@
     <!-- ========================================== -->
     <!-- VIEW 1.5: GUEST BOOKING VIEW -->
     <!-- ========================================== -->
-    <main id="guestView" style="display:none; padding: 100px 20px; min-height: 100vh; background: var(--light-gray);">
-        <div style="max-width: 1400px; margin: 0 auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 20px;">
-                <h2 style="font-family: var(--font-heading); font-size: 2.5rem; margin: 0;">Available Premium Stays</h2>
-                
-                <div style="display: flex; gap: 10px; flex-wrap: wrap; flex-grow: 1; justify-content: flex-end;">
-                    <div style="display: flex; gap: 5px; background: white; padding: 5px; border-radius: 30px; box-shadow: var(--shadow-sm);">
-                        <button class="btn-primary" id="btnGuestGrid" onclick="if(window.app) window.app.toggleGuestView('grid')" style="padding: 8px 20px; border-radius: 25px; border: none;"><i class="fa-solid fa-border-all"></i> Grid</button>
-                        <button class="btn-outline" id="btnGuestList" onclick="if(window.app) window.app.toggleGuestView('list')" style="padding: 8px 20px; border-radius: 25px; border: none;"><i class="fa-solid fa-list"></i> List</button>
-                        <button class="btn-outline" id="btnGuestMap" onclick="if(window.app) window.app.toggleGuestView('map')" style="padding: 8px 20px; border-radius: 25px; border: none;"><i class="fa-solid fa-map-location-dot"></i> Map</button>
-                    </div>
-                    <div class="input-floating" style="max-width: 300px; width: 100%; margin: 0;">
-                        <input type="text" placeholder=" " onkeyup="if(window.app) window.app.updateGuestSearch(this.value)">
-                        <label><i class="fa-solid fa-magnifying-glass"></i> Search location or name...</label>
-                    </div>
+    <main id="guestView" style="display:none;">
+        <div id="guestExclusivePage" class="antialiased selection:bg-amada-gold selection:text-white bg-[#FAFAFA] text-amada-dark min-h-screen overflow-x-hidden">
+            <div id="guestExclusiveTopBanner" class="urgency-banner-red text-white text-center py-2 px-4 sticky top-0 z-50 flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 border-b-2 border-red-900 transition-colors duration-500">
+                <span class="animate-pulse-fast"><i class="fa-solid fa-fire text-yellow-300 text-xl"></i></span>
+                <p class="text-sm sm:text-base font-bold font-serif tracking-wide drop-shadow-md">
+                    <span id="guestExclusiveBannerText">FLASH SALE: Claim 50% OFF your stay. Price jumps in:</span>
+                </p>
+                <div class="bg-white text-amada-red px-3 py-1 rounded font-mono text-xl font-extrabold tracking-widest shadow-inner border border-red-200" id="guestExclusiveCountdownTimer">
+                    00:00:35
                 </div>
             </div>
-            <div class="panel" style="margin-bottom:24px;">
-                <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:14px; align-items:end;">
-                    <div class="input-floating" style="margin:0;">
-                        <select id="guestRoomsFilter" onchange="if(window.app) window.app.updateGuestFilter('rooms', this.value)">
-                            <option value="all" selected>All Rooms</option>
-                            <option value="0">Studio</option>
-                            <option value="1">1 Room</option>
-                            <option value="2">2 Rooms</option>
-                            <option value="3">3 Rooms</option>
-                            <option value="4">4+ Rooms</option>
-                        </select>
-                        <label style="top:5px; font-size:0.7rem;">Rooms</label>
-                    </div>
-                    <div class="input-floating" style="margin:0;">
-                        <select id="guestPriceRangeFilter" onchange="if(window.app) window.app.updateGuestFilter('priceRange', this.value)">
-                            <option value="all" selected>All Prices</option>
-                            <option value="0-50000">Up to ₦50,000</option>
-                            <option value="50001-100000">₦50,001 - ₦100,000</option>
-                            <option value="100001-150000">₦100,001 - ₦150,000</option>
-                            <option value="150001-250000">₦150,001 - ₦250,000</option>
-                            <option value="250001+">₦250,001 and above</option>
-                        </select>
-                        <label style="top:5px; font-size:0.7rem;">Price Range</label>
-                    </div>
-                    <div class="input-floating" style="margin:0;">
-                        <select id="guestLocationFilter" onchange="if(window.app) window.app.updateGuestFilter('location', this.value)">
-                            <option value="all" selected>All Locations</option>
-                            <option value="Katampe">Katampe</option>
-                            <option value="Jahi">Jahi</option>
-                            <option value="Gwarinpa">Gwarinpa</option>
-                            <option value="Asokoro">Asokoro</option>
-                            <option value="Maitama">Maitama</option>
-                            <option value="Wuse">Wuse</option>
-                        </select>
-                        <label style="top:5px; font-size:0.7rem;">Location</label>
-                    </div>
-                    <div class="input-floating" style="margin:0;">
-                        <select id="guestCityFilter" onchange="if(window.app) window.app.updateGuestFilter('city', this.value)">
-                            <option value="all" selected>All Cities</option>
-                            <option value="Abuja">Abuja</option>
-                        </select>
-                        <label style="top:5px; font-size:0.7rem;">City</label>
-                    </div>
-                    <div class="input-floating" style="margin:0;">
-                        <select id="guestStateFilter" onchange="if(window.app) window.app.updateGuestFilter('state', this.value)">
-                            <option value="all" selected>All States</option>
-                            <option value="FCT">FCT</option>
-                        </select>
-                        <label style="top:5px; font-size:0.7rem;">State</label>
-                    </div>
-                    <div class="input-floating" style="margin:0;">
-                        <select id="guestSortSelect" onchange="if(window.app) window.app.updateGuestSort(this.value)">
-                            <option value="default" selected>Recommended</option>
-                            <option value="priceAsc">Price: Low to High</option>
-                            <option value="priceDesc">Price: High to Low</option>
-                        </select>
-                        <label style="top:5px; font-size:0.7rem;">Sort By</label>
-                    </div>
+
+            <nav class="absolute w-full z-40 top-14 py-4 px-6 sm:px-12 flex justify-between items-center glass-light border-b-0 shadow-sm mx-auto left-0 right-0 max-w-7xl mt-4 rounded-full">
+                <div class="flex items-center gap-2 relative">
+                    <i class="fa-solid fa-crown text-amada-gold text-2xl"></i>
+                    <h1 class="font-serif text-2xl font-black tracking-wider text-amada-dark">AMADA<span class="text-amada-red">.</span></h1>
+                    <span class="hidden md:inline-block absolute -top-3 -right-36 bg-red-50 text-amada-red text-[9px] font-black px-2 py-0.5 rounded-full border border-red-200 animate-pulse whitespace-nowrap">
+                        INVITE-ONLY PRICING ACTIVE
+                    </span>
                 </div>
-                <div style="display:flex; justify-content:flex-end; margin-top:14px;">
-                    <button class="btn-outline" style="padding:10px 18px;" onclick="if(window.app) window.app.resetGuestFilters()">
-                        <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                <div class="hidden md:flex gap-8 items-center text-sm font-bold text-gray-700">
+                    <a href="#" class="hover:text-amada-red transition border-b-2 border-transparent hover:border-amada-red pb-1">Coded Stays</a>
+                    <a href="#" class="hover:text-amada-red transition">Experiences</a>
+                    <a href="#" class="hover:text-amada-red transition">List Your Property</a>
+                </div>
+                <div>
+                    <button class="bg-amada-dark text-white px-8 py-2.5 rounded-full font-bold hover:bg-amada-gold hover:text-white transition shadow-lg flex items-center gap-2">
+                        <i class="fa-solid fa-user-lock text-xs"></i> Sign In
                     </button>
                 </div>
-            </div>
-            <div class="panel" style="margin-bottom:30px;">
-                <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
+            </nav>
+
+            <section class="relative min-h-[95vh] flex flex-col justify-center items-start pt-32 pb-16 px-6 md:px-16 overflow-hidden">
+                <div id="guestExclusiveSlide1" class="slide active" style="background-image: url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?ixlib=rb-4.0.3&auto=format&fit=crop&w=2053&q=80');">
+                    <div class="slide-overlay"></div>
+                </div>
+                <div id="guestExclusiveSlide2" class="slide" style="background-image: url('https://images.unsplash.com/photo-1512918728675-ed5a9ecdebfd?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80');">
+                    <div class="slide-overlay"></div>
+                </div>
+                <div id="guestExclusiveSlide3" class="slide" style="background-image: url('https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80');">
+                    <div class="slide-overlay"></div>
+                </div>
+
+                <div class="max-w-7xl mx-auto w-full relative z-10 grid md:grid-cols-2 gap-12 items-center">
+                    <div class="text-left">
+                        <div class="inline-flex items-center gap-2 py-1.5 px-4 rounded-full bg-amada-red/10 border border-amada-red/30 text-amada-red text-xs font-bold tracking-widest uppercase mb-6 shadow-sm">
+                            <i class="fa-solid fa-lock"></i> Strictly For People Like You
+                        </div>
+
+                        <div id="guestExclusiveHeroTextContainer" class="min-h-[250px]"></div>
+
+                        <div class="mt-8 glass-light p-4 rounded-xl border border-yellow-300 inline-flex items-center gap-4 animate-float shadow-xl relative overflow-hidden">
+                            <div class="absolute -right-4 -top-4 bg-yellow-100 w-16 h-16 rounded-full opacity-50"></div>
+                            <div class="bg-yellow-100 p-3 rounded-full text-amada-gold text-2xl relative z-10">
+                                <i class="fa-solid fa-hourglass-half"></i>
+                            </div>
+                            <div class="relative z-10">
+                                <p class="text-sm font-bold text-gray-800">Checkout within <span id="guestExclusiveHeroVipTimer" class="text-amada-red font-mono text-lg font-black">03:45</span></p>
+                                <p class="text-xs text-gray-500 font-medium">To unlock stackable <strong class="text-amada-dark">VIP Perks & Rewards</strong>.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div id="guestExclusiveSearchWidget" class="glass-light p-8 rounded-3xl shadow-2xl border border-white transition-all duration-300 relative">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="font-serif text-2xl font-bold text-gray-900">Find Your Absolute Best</h3>
+                            <span class="bg-green-100 text-green-700 text-[10px] font-black px-2 py-1 rounded border border-green-200 uppercase"><i class="fa-solid fa-bolt"></i> Instant Confirmation</span>
+                        </div>
+
+                        <div class="space-y-4">
+                            <div class="w-full flex items-center px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-amada-gold transition shadow-inner">
+                                <i class="fa-solid fa-location-dot text-amada-gold mr-3"></i>
+                                <input id="guestExclusiveHeroLocationInput" type="text" placeholder="Where do you want to stay? (e.g. Katampe)" onkeydown="if(event.key==='Enter' && window.app) window.app.submitExclusiveHeroSearch()" class="bg-transparent border-none outline-none text-gray-800 w-full placeholder-gray-400 font-medium">
+                            </div>
+                            <div class="w-full flex items-center px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-amada-gold transition shadow-inner">
+                                <i class="fa-regular fa-calendar text-amada-gold mr-3"></i>
+                                <input id="guestExclusiveHeroDateInput" type="text" placeholder="Check in - Check out" class="bg-transparent border-none outline-none text-gray-800 w-full placeholder-gray-400 font-medium" onfocus="(this.type='date')" onblur="(this.type='text')">
+                            </div>
+                            <div class="w-full flex items-center px-4 py-3 bg-gray-50 rounded-xl border border-gray-200 focus-within:border-amada-gold transition shadow-inner">
+                                <i class="fa-solid fa-user-group text-amada-gold mr-3"></i>
+                                <select id="guestExclusiveHeroGuestSelect" class="bg-transparent border-none outline-none text-gray-800 w-full font-medium cursor-pointer">
+                                    <option>1 Guest</option>
+                                    <option>2 Guests</option>
+                                    <option>3+ Guests</option>
+                                </select>
+                            </div>
+                            <button type="button" onclick="if(window.app) window.app.submitExclusiveHeroSearch()" class="w-full bg-amada-dark text-white font-black py-4 px-8 rounded-xl hover:bg-amada-red transition-all shadow-[0_10px_20px_rgba(0,0,0,0.2)] hover:shadow-[0_10px_20px_rgba(211,47,47,0.4)] flex items-center justify-center gap-2 text-lg mt-2 group">
+                                <i class="fa-solid fa-magnifying-glass group-hover:scale-110 transition-transform"></i> Search Stays
+                            </button>
+                        </div>
+
+                        <div class="mt-6 pt-4 border-t border-gray-200 flex flex-col items-center gap-2">
+                            <p class="text-xs font-bold text-gray-500"><i class="fa-solid fa-users text-amada-gold mr-1"></i> Join <strong class="text-gray-800">4,209+ elite guests</strong> who booked this month.</p>
+                            <div class="flex gap-4 mt-1 text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                                <span><i class="fa-solid fa-shield-halved mr-1"></i> Verified Hosts</span>
+                                <span><i class="fa-solid fa-headset mr-1"></i> 24/7 Concierge</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="py-16 px-6 sm:px-12 max-w-7xl mx-auto relative z-20">
+                <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 mb-7">
                     <div>
-                        <h3 style="margin:0 0 6px 0;"><i class="fa-solid fa-receipt" style="color:var(--primary)"></i> My Reservations</h3>
-                        <p style="margin:0; color:var(--gray);">Enter your phone number and booking PIN to view reservations and download receipts.</p>
+                        <h3 class="font-serif text-4xl md:text-5xl font-extrabold text-gray-900 tracking-tight leading-none">Available Premium Stays</h3>
+                        <p class="text-gray-500 font-medium text-base mt-3">Search, filter, and reserve directly from our live inventory.</p>
+                    </div>
+                    <div class="flex flex-col lg:flex-row gap-3 w-full xl:w-auto xl:items-center">
+                        <div class="inline-flex bg-white rounded-full p-1 shadow-[0_10px_30px_rgba(0,0,0,0.08)] border border-gray-100 self-start">
+                            <button id="guestExclusiveBtnGrid" type="button" onclick="if(window.app) window.app.toggleExclusiveView('grid')" class="px-5 py-3 rounded-full font-bold text-white bg-amada-red shadow-sm flex items-center gap-2 transition">
+                                <i class="fa-solid fa-table-cells"></i> Grid
+                            </button>
+                            <button id="guestExclusiveBtnList" type="button" onclick="if(window.app) window.app.toggleExclusiveView('list')" class="px-5 py-3 rounded-full font-bold text-gray-800 flex items-center gap-2 transition">
+                                <i class="fa-solid fa-list"></i> List
+                            </button>
+                            <button id="guestExclusiveBtnMap" type="button" onclick="if(window.app) window.app.toggleExclusiveView('map')" class="px-5 py-3 rounded-full font-bold text-gray-800 flex items-center gap-2 transition">
+                                <i class="fa-solid fa-map-location-dot"></i> Map
+                            </button>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-[1.6rem] px-5 py-3 flex items-center gap-3 shadow-sm min-w-0 xl:min-w-[400px]">
+                            <i class="fa-solid fa-magnifying-glass text-amada-red"></i>
+                            <input id="guestExclusiveSearchInput" type="text" placeholder="Search location or name..." oninput="if(window.app) window.app.updateExclusiveSearch(this.value)" class="w-full bg-transparent border-none outline-none text-gray-800 placeholder:text-red-300 font-semibold">
+                        </div>
                     </div>
                 </div>
-                <form onsubmit="event.preventDefault(); if(window.app) window.app.lookupGuestReservations();" style="display:grid; grid-template-columns:minmax(220px, 1fr) minmax(220px, 1fr) auto; gap:14px; align-items:end;">
-                    <div class="input-floating" style="margin:0;">
-                        <input type="tel" id="guestLookupPhone" maxlength="11" pattern="[0-9]{10,11}" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
-                        <label>Phone Number</label>
+
+                <div class="bg-white rounded-[1.8rem] p-4 md:p-5 shadow-[0_12px_40px_rgba(0,0,0,0.08)] border border-gray-100 mb-8">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto] gap-3 items-end">
+                        <label class="guest-exclusive-filter-field">
+                            <span>Rooms</span>
+                            <select id="guestExclusiveRoomsFilter" onchange="if(window.app) window.app.updateExclusiveFilter('rooms', this.value)">
+                                <option value="all">All Rooms</option>
+                                <option value="0">Studio</option>
+                                <option value="1">1 Bedroom</option>
+                                <option value="2">2 Bedrooms</option>
+                                <option value="3">3 Bedrooms</option>
+                                <option value="4">4+ Bedrooms</option>
+                            </select>
+                        </label>
+                        <label class="guest-exclusive-filter-field">
+                            <span>Price Range</span>
+                            <select id="guestExclusivePriceRangeFilter" onchange="if(window.app) window.app.updateExclusiveFilter('priceRange', this.value)">
+                                <option value="all">All Prices</option>
+                                <option value="0-50000">Up to ₦50,000</option>
+                                <option value="50001-100000">₦50,001 - ₦100,000</option>
+                                <option value="100001-150000">₦100,001 - ₦150,000</option>
+                                <option value="150001-250000">₦150,001 - ₦250,000</option>
+                                <option value="250001+">₦250,001+</option>
+                            </select>
+                        </label>
+                        <label class="guest-exclusive-filter-field">
+                            <span>Location</span>
+                            <select id="guestExclusiveLocationFilter" onchange="if(window.app) window.app.updateExclusiveFilter('location', this.value)">
+                                <option value="all">All Locations</option>
+                            </select>
+                        </label>
+                        <label class="guest-exclusive-filter-field">
+                            <span>City</span>
+                            <select id="guestExclusiveCityFilter" onchange="if(window.app) window.app.updateExclusiveFilter('city', this.value)">
+                                <option value="all">All Cities</option>
+                            </select>
+                        </label>
+                        <label class="guest-exclusive-filter-field">
+                            <span>State</span>
+                            <select id="guestExclusiveStateFilter" onchange="if(window.app) window.app.updateExclusiveFilter('state', this.value)">
+                                <option value="all">All States</option>
+                            </select>
+                        </label>
+                        <label class="guest-exclusive-filter-field">
+                            <span>Sort By</span>
+                            <select id="guestExclusiveSortSelect" onchange="if(window.app) window.app.updateExclusiveSort(this.value)">
+                                <option value="default">Recommended</option>
+                                <option value="priceAsc">Price: Low to High</option>
+                                <option value="priceDesc">Price: High to Low</option>
+                            </select>
+                        </label>
+                        <div class="flex xl:justify-end">
+                        <button type="button" onclick="if(window.app) window.app.resetExclusiveFilters()" class="inline-flex items-center justify-center gap-2 border-2 border-gray-900 text-gray-900 px-5 py-3 rounded-full font-black hover:bg-gray-900 hover:text-white transition whitespace-nowrap w-full xl:w-auto">
+                            <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                        </button>
+                        </div>
                     </div>
-                    <div class="input-floating" style="margin:0;">
-                        <input type="password" id="guestLookupPin" required>
-                        <label>Booking PIN / Access Code</label>
+                </div>
+
+                <div id="guestExclusiveListingsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10"></div>
+                <div id="guestExclusiveMapArea" class="hidden rounded-[2rem] overflow-hidden border border-gray-200 shadow-[0_12px_40px_rgba(0,0,0,0.08)] bg-white" style="height: 680px;"></div>
+            </section>
+
+            <section class="px-6 sm:px-12 max-w-7xl mx-auto relative z-20 mb-16">
+                <div class="bg-white rounded-[2rem] p-6 md:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.08)] border border-gray-100">
+                    <div class="flex items-center gap-3 mb-3">
+                        <i class="fa-solid fa-receipt text-amada-red text-2xl"></i>
+                        <h3 class="text-3xl md:text-4xl font-black text-gray-900">Rewards & Receipts</h3>
                     </div>
-                    <button class="btn-primary" style="justify-content:center; height:54px;">
-                        <i class="fa-solid fa-magnifying-glass"></i> Find Reservations
-                    </button>
-                </form>
-                <div id="guestReservationsArea" style="margin-top:24px;"></div>
+                    <p class="text-gray-500 text-lg font-medium mb-8">Enter your phone number and booking PIN to claim unlocked rewards or download receipts after your spin.</p>
+                    <div class="grid grid-cols-1 xl:grid-cols-[1fr_1fr_auto] gap-4 items-end">
+                        <label class="guest-exclusive-reservation-field">
+                            <span>Phone Number</span>
+                            <input id="guestExclusiveLookupPhone" type="tel" placeholder="Phone Number">
+                        </label>
+                        <label class="guest-exclusive-reservation-field">
+                            <span>Booking PIN / Access Code</span>
+                            <input id="guestExclusiveLookupPin" type="password" placeholder="Booking PIN / Access Code">
+                        </label>
+                        <button type="button" onclick="if(window.app) window.app.lookupExclusiveReservations()" class="h-[78px] px-10 rounded-full bg-amada-red text-white font-black text-xl shadow-[0_10px_24px_rgba(211,47,47,0.3)] hover:bg-red-700 transition inline-flex items-center justify-center gap-3">
+                            <i class="fa-solid fa-magnifying-glass"></i> Find Reservations
+                        </button>
+                    </div>
+                    <div id="guestExclusiveReservationsArea" class="mt-8"></div>
+                </div>
+            </section>
+
+            <div id="guestExclusivePerksWidget" class="fixed bottom-4 right-4 z-40 glass-light border-2 border-amada-gold p-4 rounded-2xl shadow-[0_10px_40px_rgba(212,175,55,0.25)] w-72 transform transition-all duration-500 hidden md:block">
+                <div class="absolute -top-3 -right-3 bg-amada-gold text-black w-8 h-8 rounded-full flex items-center justify-center font-bold shadow-lg border-2 border-white animate-pulse" id="guestExclusiveGiftIconAnim">
+                    <i class="fa-solid fa-gift"></i>
+                </div>
+                <h4 class="font-black text-gray-900 text-xs uppercase tracking-widest mb-1">🎁 Claim Your Perks</h4>
+                <p class="text-[10px] text-gray-500 mb-3 font-medium leading-tight">Checkout before the timers run out to keep these stackable rewards!</p>
+
+                <div class="space-y-1.5 max-h-[300px] overflow-y-auto slim-scrollbar pr-1 pb-1">
+                    <div id="guestExclusivePerk1" class="flex justify-between items-center bg-green-50 border-2 border-green-500 shadow-[0_0_12px_rgba(34,197,94,0.4)] p-2 rounded-xl transition-all duration-300 scale-[1.02]">
+                        <span class="text-[11px] font-bold text-green-800 flex items-center gap-2"><i class="fa-solid fa-moon text-green-600 w-3"></i> Free Night</span>
+                        <span id="guestExclusiveTimer1" class="font-mono text-[11px] font-black text-green-700 bg-white px-2 py-0.5 rounded border border-green-200 shadow-sm">00:45</span>
+                    </div>
+                    <div id="guestExclusivePerk2" class="flex justify-between items-center bg-green-50 border border-green-100 p-2 rounded-xl transition-all duration-300">
+                        <span class="text-[11px] font-bold text-green-800 flex items-center gap-2"><i class="fa-solid fa-tags text-green-600 w-3"></i> 50% Off Stay</span>
+                        <span id="guestExclusiveTimer2" class="font-mono text-[11px] font-black text-green-700 bg-white px-2 py-0.5 rounded border border-green-200 shadow-sm">01:15</span>
+                    </div>
+                    <div id="guestExclusivePerk3" class="flex justify-between items-center bg-green-50 border border-green-100 p-2 rounded-xl transition-all duration-300">
+                        <span class="text-[11px] font-bold text-green-800 flex items-center gap-2"><i class="fa-solid fa-percent text-green-600 w-3"></i> 10% Off Stay</span>
+                        <span id="guestExclusiveTimer3" class="font-mono text-[11px] font-black text-green-700 bg-white px-2 py-0.5 rounded border border-green-200 shadow-sm">01:45</span>
+                    </div>
+                    <div id="guestExclusivePerk4" class="flex justify-between items-center bg-green-50 border border-green-100 p-2 rounded-xl transition-all duration-300">
+                        <span class="text-[11px] font-bold text-green-800 flex items-center gap-2"><i class="fa-solid fa-car text-green-600 w-3"></i> Free Ride Booking</span>
+                        <span id="guestExclusiveTimer4" class="font-mono text-[11px] font-black text-green-700 bg-white px-2 py-0.5 rounded border border-green-200 shadow-sm">02:15</span>
+                    </div>
+                    <div id="guestExclusivePerk5" class="flex justify-between items-center bg-green-50 border border-green-100 p-2 rounded-xl transition-all duration-300">
+                        <span class="text-[11px] font-bold text-green-800 flex items-center gap-2"><i class="fa-solid fa-utensils text-green-600 w-3"></i> Free Lunch</span>
+                        <span id="guestExclusiveTimer5" class="font-mono text-[11px] font-black text-green-700 bg-white px-2 py-0.5 rounded border border-green-200 shadow-sm">02:45</span>
+                    </div>
+                    <div id="guestExclusivePerk6" class="flex justify-between items-center bg-green-50 border border-green-100 p-2 rounded-xl transition-all duration-300">
+                        <span class="text-[11px] font-bold text-green-800 flex items-center gap-2"><i class="fa-solid fa-clock text-green-600 w-3"></i> Late Checkout</span>
+                        <span id="guestExclusiveTimer6" class="font-mono text-[11px] font-black text-green-700 bg-white px-2 py-0.5 rounded border border-green-200 shadow-sm">03:15</span>
+                    </div>
+                    <div id="guestExclusivePerk7" class="flex justify-between items-center bg-green-50 border border-green-100 p-2 rounded-xl transition-all duration-300">
+                        <span class="text-[11px] font-bold text-green-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-green-600 w-3"></i> Free Protection</span>
+                        <span id="guestExclusiveTimer7" class="font-mono text-[11px] font-black text-green-700 bg-white px-2 py-0.5 rounded border border-green-200 shadow-sm">03:45</span>
+                    </div>
+                </div>
             </div>
-            <div id="guestGridArea"></div>
-            <div id="guestMapArea" style="display:none; height: 600px; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid #eee; z-index: 1; box-shadow: var(--shadow-md);"></div>
+
+            <div id="guestExclusiveToastContainer"></div>
+
+            <div id="guestExclusiveBookingModal" class="modal-overlay">
+                <div class="modal-content bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(211,47,47,0.15)] relative border-2 border-red-100 transition-colors duration-300" id="guestExclusiveModalBox">
+                    <button onclick="if(window.app) window.app.closeExclusiveBookingModal()" class="absolute top-4 right-4 text-gray-700 hover:text-amada-red bg-white/95 border border-gray-200 rounded-full w-10 h-10 flex items-center justify-center transition z-30 shadow"><i class="fa-solid fa-times text-lg"></i></button>
+                    <div class="bg-gray-50 px-8 pt-8 pb-4 text-center relative border-b border-gray-200">
+                        <div class="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-amada-dark text-white text-[10px] font-black uppercase tracking-widest px-4 py-1.5 rounded-full shadow-lg whitespace-nowrap">
+                            <i class="fa-solid fa-lock text-amada-gold mr-1"></i> Rate Locked For <span id="guestExclusiveModalCountdown" class="text-amada-gold">03:45</span>
+                        </div>
+                        <h3 class="font-serif text-3xl font-black text-gray-900 mb-1 mt-2" id="guestExclusiveBookingTitle">Property Name</h3>
+                        <p class="text-amada-red font-extrabold text-xl" id="guestExclusiveBookingPrice">Price</p>
+                    </div>
+                    <div class="p-8">
+                        <div class="flex items-center justify-between mb-6 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                            <span class="text-amada-red">1. Details</span>
+                            <div class="h-px bg-gray-200 flex-grow mx-2"></div>
+                            <span>2. Spin & Reward</span>
+                        </div>
+                        <div class="bg-red-50 border border-red-200 text-red-800 text-sm p-4 rounded-xl mb-6 flex items-start gap-3 shadow-inner">
+                            <i class="fa-solid fa-triangle-exclamation text-amada-red mt-0.5 text-lg animate-pulse"></i>
+                            <p class="font-medium" id="guestExclusiveFlightRiskText"><strong class="font-black text-amada-red">High Flight Risk!</strong> Another guest is viewing these dates. Complete your booking now to secure your stay and all <strong class="underline decoration-2">7 VIP Perks.</strong></p>
+                        </div>
+                        <form id="guestExclusiveCheckoutForm" onsubmit="event.preventDefault(); if(window.app) window.app.handleExclusiveCheckout();">
+                            <div class="space-y-4">
+                                <div class="bg-gray-50 px-5 py-5 rounded-2xl border-l-4 border-amada-red">
+                                    <div class="font-serif text-2xl font-bold text-gray-900" id="guestExclusiveBookingInfoTitle">Property Name</div>
+                                    <div class="text-gray-500 text-xl mt-1" id="guestExclusiveBookingInfoPrice">₦0 / night</div>
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Check-In</label>
+                                        <input type="date" id="guestExclusiveCheckInDate" required onchange="if(window.app) window.app.calcExclusiveTotal()" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900 focus:border-amada-red focus:ring-2 focus:ring-red-100 outline-none transition font-medium">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Check-Out</label>
+                                        <input type="date" id="guestExclusiveCheckOutDate" required onchange="if(window.app) window.app.calcExclusiveTotal()" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900 focus:border-amada-red focus:ring-2 focus:ring-red-100 outline-none transition font-medium">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Full Name</label>
+                                    <input type="text" id="guestExclusiveName" required class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900 focus:border-amada-red focus:ring-2 focus:ring-red-100 outline-none transition font-medium" placeholder="John Doe">
+                                </div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Phone Number</label>
+                                        <input type="tel" id="guestExclusivePhone" required maxlength="11" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900 focus:border-amada-red focus:ring-2 focus:ring-red-100 outline-none transition font-medium" placeholder="Phone No. (Max 11 digits)" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Email (Optional)</label>
+                                        <input type="email" id="guestExclusiveEmail" class="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900 focus:border-amada-red focus:ring-2 focus:ring-red-100 outline-none transition font-medium" placeholder="john@example.com">
+                                    </div>
+                                </div>
+                                <div class="bg-[#fbfbfb] px-6 py-7 rounded-2xl border-2 border-dashed border-gray-200 text-center">
+                                    <div class="text-sm text-gray-500 uppercase font-bold">Total Estimate (<span id="guestExclusiveNightCount">1</span> Nights)</div>
+                                    <div id="guestExclusiveModalTotal" class="text-5xl font-black text-gray-900 mt-3">₦0</div>
+                                    <div id="guestExclusiveChargeBreakdown" class="text-base text-gray-500 mt-3">Stay only</div>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Caution Fee (₦)</label>
+                                    <input type="text" id="guestExclusiveCautionFeePaid" data-currency inputmode="numeric" autocomplete="off" value="0" oninput="if(window.app) window.app.calcExclusiveTotal()" class="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900 focus:border-amada-red focus:ring-2 focus:ring-red-100 outline-none transition font-medium">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-bold text-gray-700 mb-1 uppercase tracking-wide">Actual Amount Paid (₦)</label>
+                                    <input type="text" id="guestExclusiveActualPaid" data-currency inputmode="numeric" autocomplete="off" required class="w-full bg-white border border-gray-300 rounded-xl px-4 py-3.5 text-gray-900 focus:border-amada-red focus:ring-2 focus:ring-red-100 outline-none transition font-medium">
+                                </div>
+                                <div class="flex items-center gap-2 mt-2 bg-yellow-50 p-3 rounded-lg border border-yellow-200 cursor-pointer">
+                                    <input type="checkbox" id="guestExclusivePerkBox" checked class="w-4 h-4 text-amada-gold border-gray-300 rounded focus:ring-amada-gold cursor-pointer">
+                                    <label for="guestExclusivePerkBox" id="guestExclusivePerkBoxLabel" class="text-xs font-bold text-yellow-800 cursor-pointer select-none">Yes, apply my 7 remaining VIP perks to this booking.</label>
+                                </div>
+                                <button type="submit" class="w-full bg-amada-red hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-[0_10px_20px_rgba(211,47,47,0.3)] transition mt-2 flex justify-center items-center gap-2 text-lg uppercase tracking-wide">
+                                    <i class="fa-solid fa-credit-card"></i> Proceed To Secure Payment
+                                </button>
+                            </div>
+                        </form>
+                        <div class="mt-5 pt-4 border-t border-gray-100 flex justify-center gap-4 text-gray-400">
+                            <i class="fa-brands fa-cc-visa text-2xl"></i>
+                            <i class="fa-brands fa-cc-mastercard text-2xl"></i>
+                            <i class="fa-solid fa-shield-halved text-2xl" title="256-bit Encryption"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="guestExclusiveBookingPerksDock" class="hidden fixed top-1/2 right-4 -translate-y-1/2 z-[10000] w-[280px] bg-white border-2 border-amber-200 rounded-3xl p-4 shadow-[0_20px_60px_rgba(0,0,0,0.18)]">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                    <p class="text-xs text-amber-700 font-black uppercase tracking-widest">Live Perks In This Booking</p>
+                </div>
+                <div id="guestExclusiveBookingPerksList" class="grid grid-cols-1 gap-2"></div>
+            </div>
+
+            <div id="guestExclusiveSpinModal" class="modal-overlay">
+                <div class="modal-content bg-white border border-gray-200 w-full max-w-4xl rounded-3xl overflow-hidden shadow-2xl flex flex-col md:flex-row relative">
+                    <button onclick="if(window.app) window.app.closeExclusiveSpinModal()" class="absolute top-4 right-4 text-gray-500 hover:text-black bg-gray-100 rounded-full w-10 h-10 flex items-center justify-center transition z-50 shadow"><i class="fa-solid fa-times text-xl"></i></button>
+                    <div class="w-full md:w-1/2 p-8 md:p-12 flex flex-col justify-center bg-gray-50 border-r border-gray-200 relative overflow-hidden">
+                        <i class="fa-solid fa-gift absolute -top-10 -left-10 text-9xl text-gray-100 opacity-50 transform -rotate-12"></i>
+                        <div class="relative z-10">
+                            <span class="inline-flex items-center gap-1 bg-green-100 text-green-800 text-xs font-black uppercase tracking-widest px-3 py-1 rounded-full mb-4 shadow-sm border border-green-200"><i class="fa-solid fa-check-circle"></i> Booking Confirmed!</span>
+                            <h2 class="font-serif text-4xl md:text-5xl font-black text-gray-900 mb-4 leading-tight">Unlock Your <br><span class="text-amada-gold drop-shadow-md">Reward.</span></h2>
+                            <p class="text-gray-600 font-medium mb-8 text-base leading-relaxed" id="guestExclusivePostBookingText">
+                                Because you booked within the window, your surviving perks are locked in. Now, take your <strong class="text-amada-red font-black">Free Spin</strong> to win a Free Night, Massage, or Cash Refund.
+                            </p>
+                            <div class="bg-white border border-gray-200 p-5 rounded-2xl mb-6 shadow-md">
+                                <p class="text-xs text-gray-500 mb-3 uppercase tracking-widest font-black flex items-center gap-2"><i class="fa-solid fa-trophy text-amada-gold"></i> Live Winners Board</p>
+                                <div id="guestExclusiveLiveWinnersList" class="space-y-3 h-[72px] overflow-hidden relative">
+                                    <div class="text-sm flex justify-between items-center"><span class="font-bold text-gray-800">Sarah T.</span> <span class="text-green-600 font-black bg-green-50 px-2 py-0.5 rounded border border-green-100">Won 100% Refund</span></div>
+                                    <div class="text-sm flex justify-between items-center"><span class="font-bold text-gray-800">David O.</span> <span class="text-amada-red font-black bg-red-50 px-2 py-0.5 rounded border border-red-100">Won Free Massage</span></div>
+                                    <div class="text-sm flex justify-between items-center"><span class="font-bold text-gray-800">Amina M.</span> <span class="text-amada-gold font-black bg-yellow-50 px-2 py-0.5 rounded border border-yellow-100">Won Free Dinner</span></div>
+                                </div>
+                            </div>
+                            <div class="bg-white border border-dashed border-amada-gold p-4 rounded-2xl mb-6 shadow-sm">
+                                <p class="text-xs text-gray-500 mb-3 uppercase tracking-widest font-black flex items-center gap-2"><i class="fa-solid fa-list-check text-amada-gold"></i> Eligible Spin Items</p>
+                                <div id="guestExclusiveEligiblePerksList" class="flex flex-wrap gap-2"></div>
+                            </div>
+                            <p class="text-xs font-bold text-gray-400 italic"><i class="fa-solid fa-circle-info"></i> Valid for this booking only. Spin carefully.</p>
+                        </div>
+                    </div>
+                    <div class="w-full md:w-1/2 p-8 flex flex-col items-center justify-center bg-white relative">
+                        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(212,175,55,0.08)_0,rgba(255,255,255,0)_60%)] pointer-events-none"></div>
+                        <div class="wheel-container">
+                            <canvas id="guestExclusiveSpinWheelCanvas" width="320" height="320"></canvas>
+                            <div class="pointer" id="guestExclusivePointerEl"></div>
+                        </div>
+                        <button id="guestExclusiveSpinButton" class="mt-10 bg-amada-dark text-white font-black py-4 px-12 rounded-full hover:bg-amada-gold transition-colors shadow-[0_10px_30px_rgba(0,0,0,0.2)] text-xl uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed w-full max-w-[280px]">
+                            SPIN NOW
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="guestExclusivePrizeModal" class="modal-overlay">
+                <div class="modal-content bg-white border-4 border-amada-gold w-full max-w-md rounded-3xl p-10 text-center shadow-[0_20px_60px_rgba(212,175,55,0.3)]">
+                    <i class="fa-solid fa-trophy text-6xl text-amada-gold mb-6 drop-shadow-[0_0_15px_rgba(212,175,55,0.6)] animate-bounce"></i>
+                    <h2 class="font-serif text-4xl font-black text-gray-900 mb-2" id="guestExclusivePrizeModalTitle">You Won!</h2>
+                    <div class="bg-gray-50 border border-gray-200 rounded-2xl p-6 mb-8 shadow-inner">
+                        <p id="guestExclusivePrizeResult" class="text-2xl font-black text-amada-red"></p>
+                        <p id="guestExclusivePrizeDetail" class="text-sm font-medium text-gray-600 mt-2"></p>
+                    </div>
+                    <div id="guestExclusiveQrCodeEl" class="bg-white p-3 rounded-xl border border-gray-200 inline-block mb-6 mx-auto shadow-md"></div>
+                    <p id="guestExclusivePrizeClaimNote" class="text-xs font-bold text-gray-500 mb-4 px-4">Download your reward receipt and present it at check-in to claim your reward.</p>
+                    <button id="guestExclusiveRewardDownloadButton" type="button" onclick="if(window.app) window.app.downloadExclusiveRewardReceipt()" class="hidden w-full mb-4 bg-white text-amada-dark font-black py-4 rounded-xl border-2 border-gray-900 hover:bg-gray-900 hover:text-white transition shadow-lg text-lg inline-flex items-center justify-center gap-3">
+                        <i class="fa-solid fa-download"></i> Download Reward Receipt
+                    </button>
+                    <button onclick="if(window.app) window.app.closeExclusivePrizeModal()" class="w-full bg-amada-dark text-white font-black py-4 rounded-xl hover:bg-gray-800 transition shadow-lg text-lg">
+                        Continue
+                    </button>
+                </div>
+            </div>
+
+            <div id="guestExclusiveExitModal" class="modal-overlay">
+                <div class="modal-content bg-white border-4 border-amada-red w-full max-w-lg rounded-3xl p-10 text-center shadow-[0_20px_60px_rgba(211,47,47,0.3)] relative overflow-hidden">
+                    <button onclick="if(window.app) window.app.closeExclusiveExitModal()" class="absolute top-4 right-4 text-gray-400 hover:text-black bg-gray-100 rounded-full w-8 h-8 flex items-center justify-center transition z-10"><i class="fa-solid fa-times"></i></button>
+                    <i class="fa-solid fa-plane-arrival text-6xl text-amada-red mb-4 drop-shadow-[0_0_15px_rgba(211,47,47,0.4)] animate-bounce"></i>
+                    <h2 class="font-serif text-4xl font-black text-gray-900 mb-2">Leaving So Soon?</h2>
+                    <p class="text-gray-600 font-medium mb-6 text-lg">Don't abandon your <strong class="text-amada-red font-black">remaining Perks & Free Spin!</strong></p>
+                    <div class="bg-red-50 border border-red-100 rounded-2xl p-5 mb-8 shadow-inner text-left">
+                        <h4 class="font-bold text-gray-900 mb-3 flex items-center gap-2"><i class="fa-solid fa-shield-check text-green-600"></i> Why Book With Us Today?</h4>
+                        <ul class="text-sm text-gray-700 space-y-3 font-medium">
+                            <li class="flex items-start gap-2"><i class="fa-solid fa-layer-group text-green-500 mt-1"></i><span><strong>Stackable Rewards:</strong> Your surviving perks apply <em>on top</em> of the flash discount.</span></li>
+                            <li class="flex items-start gap-2"><i class="fa-solid fa-building-columns text-green-500 mt-1"></i><span><strong>Secure Payment:</strong> We don't need your credit card. Pay easily and securely via Bank Transfer.</span></li>
+                            <li class="flex items-start gap-2"><i class="fa-solid fa-rotate-left text-green-500 mt-1"></i><span><strong>Zero Risk:</strong> 100% Refundable options available.</span></li>
+                        </ul>
+                    </div>
+                    <div class="flex flex-col gap-3">
+                        <button onclick="if(window.app) window.app.claimExclusiveExitOffer()" class="w-full bg-amada-red text-white font-black py-4 rounded-xl hover:bg-red-800 transition shadow-[0_10px_20px_rgba(211,47,47,0.3)] text-lg uppercase tracking-wide">
+                            Claim My Discount & Perks Now
+                        </button>
+                        <button onclick="if(window.app) window.app.closeExclusiveExitModal()" class="text-gray-400 font-bold text-sm hover:text-gray-600 underline decoration-gray-300 underline-offset-4 mt-2">
+                            No thanks, I'll pay full price later
+                        </button>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -323,7 +691,7 @@
                 <button id="btnHost" class="role-btn" onclick="app.requestRole('host')" style="display:none;"><i class="fa-solid fa-house-user"></i> Host</button>
                 <button id="btnStaff" class="role-btn active" onclick="app.requestRole('staff')"><i class="fa-solid fa-bell-concierge"></i> Staff</button>
                 <button id="btnMgmt" class="role-btn" onclick="app.requestRole('management')"><i class="fa-solid fa-briefcase"></i> Management</button>
-                <button id="btnChair" class="role-btn" onclick="app.requestRole('chairman')"><i class="fa-solid fa-user-tie"></i> Chairman</button>
+                <button id="btnChair" class="role-btn" onclick="app.requestRole('chairman')"><i class="fa-solid fa-user-tie"></i> Executive</button>
             </div>
             <div style="display:flex; gap:15px; align-items:center;">
                 <div class="sync-indicator">
@@ -671,6 +1039,12 @@
                 <div style="font-family: monospace; font-size: 2.5rem; font-weight: 700; letter-spacing: 8px; color: #FFD700; text-shadow: 0 0 10px rgba(255,215,0,0.3);" id="recCode"></div>
                 <div style="font-size: 0.75rem; color: #888; margin-top: 10px;">Use this code to unlock the door during your stay.</div>
             </div>
+
+            <div id="receiptRewardBox" style="display:none; background: linear-gradient(135deg, #fff6da, #ffe6b8); border: 1px solid #f2c46d; border-radius: var(--radius-md); padding: 18px; text-align:left; margin-bottom:25px;">
+                <div style="font-size:0.78rem; color:#8a5a00; text-transform:uppercase; font-weight:700; letter-spacing:0.08em; margin-bottom:6px;">Bonus Booking Reward</div>
+                <div id="recRewardTitle" style="font-size:1.15rem; font-weight:700; color:#1a1a1a;"></div>
+                <div id="recRewardDetail" style="font-size:0.92rem; color:#6b5a3d; margin-top:6px;"></div>
+            </div>
             
             <button class="btn-outline" style="width: 100%; justify-content: center; padding:14px; font-size:1rem; margin-bottom:12px;" onclick="app.downloadCurrentReceipt()">
                 <i class="fa-solid fa-download"></i> Download Receipt
@@ -679,10 +1053,47 @@
         </div>
     </div>
 
+    <div id="rewardModal" class="modal">
+        <div class="modal-content reward-modal-content">
+            <button class="close-modal" onclick="app.completeRewardFlow()"><i class="fa-solid fa-times"></i></button>
+            <div class="reward-header">
+                <div class="reward-kicker">Confirmed Booking Bonus</div>
+                <h2>Your stay is locked in. Spin once to reveal your reward.</h2>
+                <p>Every confirmed direct booking unlocks one bonus spin. The result is attached to your receipt immediately.</p>
+            </div>
+
+            <div class="reward-wheel-layout">
+                <div class="reward-wheel-shell">
+                    <div class="reward-wheel-pointer"></div>
+                    <canvas id="rewardWheelCanvas" width="340" height="340"></canvas>
+                </div>
+                <div class="reward-side-panel">
+                    <div class="reward-side-box">
+                        <div class="reward-side-title">Possible rewards</div>
+                        <div id="rewardLegend" class="reward-legend"></div>
+                    </div>
+                    <div class="reward-result-box">
+                        <div class="reward-side-title">Your bonus</div>
+                        <div id="rewardResultText" class="reward-result-text">Press spin to reveal your booking reward.</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="reward-actions">
+                <button id="rewardSpinButton" class="btn-primary" style="justify-content:center;" onclick="app.spinRewardWheel()">
+                    <i class="fa-solid fa-dice"></i> Spin My Reward
+                </button>
+                <button id="rewardContinueButton" class="btn-outline" style="justify-content:center;" onclick="app.completeRewardFlow()" disabled>
+                    Continue To Receipt
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Property Details Modal -->
     <div id="propDetailsModal" class="modal">
-        <div class="modal-content" style="max-width: 900px; padding: 0; overflow: hidden;">
-            <button class="close-modal" style="z-index: 20;" onclick="app.closeModal()"><i class="fa-solid fa-times"></i></button>
+        <div class="modal-content" style="max-width: 900px; padding: 0; overflow-x: hidden; overflow-y: auto; max-height: calc(100vh - 72px);">
+            <button class="close-modal" style="z-index: 30; background: rgba(255,255,255,0.96); color: #111; box-shadow: 0 10px 24px rgba(0,0,0,0.14); border: 1px solid rgba(0,0,0,0.08);" onclick="app.closeModal()"><i class="fa-solid fa-times"></i></button>
             
             <div id="pdCarousel" class="carousel-wrapper" style="height: 350px; border-radius: 0;">
                 <!-- Images injected via JS -->
@@ -699,9 +1110,14 @@
                             </div>
                         </div>
                         
-                        <p style="color: #555; line-height: 1.6; font-size: 0.95rem; margin-bottom: 25px;">
+                        <p id="pdDescription" style="color: #555; line-height: 1.6; font-size: 0.95rem; margin-bottom: 25px;">
                             Experience unparalleled luxury in this elegantly designed space. Perfect for both short getaways and extended stays, offering top-tier comfort, sophisticated decor, and premium amenities to ensure an unforgettable experience in the heart of the city.
                         </p>
+
+                        <h3 style="font-size: 1.1rem; margin-bottom: 10px;">Booking Perks In Play</h3>
+                        <div class="amenities-container" id="pdPerks">
+                            <!-- Perks injected via JS -->
+                        </div>
                         
                         <h3 style="font-size: 1.1rem; margin-bottom: 10px;">Premium Amenities</h3>
                         <div class="amenities-container" id="pdAmenities">

@@ -57,7 +57,7 @@
     async function switchView(view) {
         document.getElementById('homeView').style.display = view === 'home' ? 'block' : 'none';
         document.getElementById('topBanner').style.display = view === 'home' ? 'flex' : 'none';
-        document.getElementById('mainHeader').style.display = (view === 'home' || view === 'guest') ? 'block' : 'none';
+        document.getElementById('mainHeader').style.display = view === 'home' ? 'block' : 'none';
         document.getElementById('guestView').style.display = view === 'guest' ? 'block' : 'none';
         
         const portal = document.getElementById('portalView');
@@ -71,8 +71,7 @@
             }
             if (window.app?.ready) await window.app.ready;
             if(view === 'guest' && window.app) {
-                window.app.renderGuestGrid();
-                if (window.app.guestViewMode === 'map') window.app.initGuestMap();
+                window.app.initExclusiveGuestPage();
             }
         } else {
             portal.style.display = 'none';
@@ -123,6 +122,31 @@
             const hasValue = field.value != null && String(field.value).trim() !== '';
             wrapper.classList.toggle('is-filled', hasValue);
         });
+    }
+
+    function formatPromoCountdown(totalSeconds) {
+        const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
+        const secs = String(totalSeconds % 60).padStart(2, '0');
+        return `${mins}:${secs}`;
+    }
+
+    let tickSound = null;
+
+    function setupSounds() {
+        if (typeof Tone === 'undefined') return null;
+        if (tickSound) return tickSound;
+
+        try {
+            tickSound = new Tone.MembraneSynth({
+                pitchDecay: 0.008,
+                octaves: 2,
+                envelope: { attack: 0.0006, decay: 0.1, sustain: 0 }
+            }).toDestination();
+        } catch {
+            tickSound = null;
+        }
+
+        return tickSound;
     }
 
     function openLegalModal(type) {
@@ -258,6 +282,105 @@
             this.guestSearchQuery = '';
             this.guestViewMode = 'grid';
             this.staffViewMode = 'grid';
+            this.currentRewardData = null;
+            this.currentRewardTransactionId = null;
+            this.pendingReceiptData = null;
+            this.rewardPrizes = [
+                { label: 'Free Drinks On Us', detail: 'A complimentary drinks reward attached to this reservation.', color: '#ff5c7a' },
+                { label: 'Free Massage', detail: 'A relaxing massage reward unlocked after booking.', color: '#ffb347' },
+                { label: '100% Booking Refund', detail: 'One lucky guest gets the full booking amount refunded.', color: '#ffd166' },
+                { label: 'Free Stay Protection', detail: 'A complimentary stay protection perk added to your booking.', color: '#06d6a0' },
+                { label: 'Free Dinner', detail: 'Dinner is covered on us for this stay.', color: '#118ab2' },
+                { label: 'Free Lunch', detail: 'A lunch reward is now attached to your reservation.', color: '#7b61ff' },
+                { label: 'Free Night', detail: 'A lucky guest bonus that can turn this stay into an even bigger win.', color: '#9c6644' },
+                { label: '15% Off Next Stay', detail: 'A comeback discount for your next direct booking.', color: '#ef476f' }
+            ];
+            this.rewardWheelState = {
+                angle: 0,
+                spinning: false,
+                selectedIndex: null
+            };
+            this.flashOfferInterval = null;
+            this.mealOfferInterval = null;
+            this.exclusiveGuestInitialized = false;
+            this.exclusiveHeroInterval = null;
+            this.exclusiveMasterTimerInterval = null;
+            this.exclusiveModalTimerInterval = null;
+            this.exclusiveSocialProofInterval = null;
+            this.exclusiveLiveWinnersInterval = null;
+            this.exclusiveHasTriggeredExit = false;
+            this.exclusiveBookingConfirmed = false;
+            this.exclusiveCurrentSlide = 0;
+            this.exclusiveDiscountPhase = 1;
+            this.exclusiveDiscountTimeLeft = 35;
+            this.exclusiveHeroVipTimeLeft = 225;
+            this.exclusiveModalTimeLeft = 300;
+            this.exclusivePerkDurations = [45, 75, 105, 135, 165, 195, 225];
+            this.exclusivePerkLost = [false, false, false, false, false, false, false];
+            this.exclusiveIsSpinning = false;
+            this.exclusiveCurrentPrizeData = null;
+            this.exclusiveSelectedPropertyId = null;
+            this.exclusivePendingTransactionId = null;
+            this.exclusiveRewardReceiptTxId = null;
+            this.exclusiveSpinState = {
+                angle: 0,
+                phase: 'idle',
+                animationStartTime: null,
+                initialStartAngle: 0,
+                initialTargetAngle: 0,
+                bounceStartAngle: 0,
+                bounceTargetAngle: 0,
+                pointerSwinging: false,
+                pointerSwingStartTime: 0,
+                lastTickAngle: 0
+            };
+            this.exclusiveHeroSlides = [
+                {
+                    title: "You Deserve The Absolute Best.",
+                    subtitle: "Book coded stays in the most exclusive locations.",
+                    perkTitle: "LUCKY GUESTS GET A",
+                    perkHighlight: "FREE NIGHT",
+                    perkIcon: "fa-moon"
+                },
+                {
+                    title: "Luxury Apartments For People Like You.",
+                    subtitle: "Book lowkey apartments with world-class amenities.",
+                    perkTitle: "UNLIMITED",
+                    perkHighlight: "FREE DRINKS ON US",
+                    perkIcon: "fa-martini-glass-citrus"
+                },
+                {
+                    title: "Unmatched Comfort & Privacy.",
+                    subtitle: "Your staycation elevated to the highest standard.",
+                    perkTitle: "WIN A RELAXING",
+                    perkHighlight: "FREE MASSAGE",
+                    perkIcon: "fa-spa"
+                }
+            ];
+            this.exclusiveToastNames = ["Thomas", "Sarah", "Oluwaseun", "Chioma", "Ahmad", "Nneka", "Eze"];
+            this.exclusiveToastLocations = ["Maitama", "Wuse 2", "Asokoro", "Gwarinpa", "Katampe", "Lagos"];
+            this.exclusiveToastActions = ["just booked the Penthouse!", "claimed a Free Massage!", "won a Free Night!", "secured 15% Off!", "got 100% Refunded!", "activated Free Protection!"];
+            this.exclusivePerkPrizeDefinitions = [
+                { text: "FREE NIGHT", colors: { start: "#D4AF37", end: "#B8860B" }, detail: "Your entire stay is on us. 100% comped." },
+                { text: "50% OFF", colors: { start: "#D32F2F", end: "#8B0000" }, detail: "We are slashing 50% off your total bill." },
+                { text: "10% OFF", colors: { start: "#FFFFFF", end: "#F3F4F6" }, detail: "A 10% discount has been attached to your booking.", textColor: "#111111" },
+                { text: "FREE RIDE", colors: { start: "#D4AF37", end: "#B8860B" }, detail: "Your ride booking is on us for this stay." },
+                { text: "FREE LUNCH", colors: { start: "#FFFFFF", end: "#F3F4F6" }, detail: "A complimentary luxury lunch experience.", textColor: "#111111" },
+                { text: "LATE CHECKOUT", colors: { start: "#D32F2F", end: "#8B0000" }, detail: "Enjoy extra time before checkout at no extra cost." },
+                { text: "FREE PROTECTION", colors: { start: "#FFFFFF", end: "#F3F4F6" }, detail: "Premium booking protection & concierge included.", textColor: "#111111" }
+            ];
+            this.exclusiveBasicPerkPrizeDefinitions = [
+                { text: "FREE LAUNDRY", colors: { start: "#D4AF37", end: "#B8860B" }, detail: "Complimentary laundry service has been attached to this booking." },
+                { text: "FREE BREAKFAST", colors: { start: "#FFFFFF", end: "#F3F4F6" }, detail: "Breakfast is on us for this stay.", textColor: "#111111" },
+                { text: "5% OFF", colors: { start: "#D32F2F", end: "#8B0000" }, detail: "A 5% discount has been attached to your booking." }
+            ];
+            this.exclusiveLosingSpinPrizes = [
+                { text: "SO CLOSE!", colors: { start: "#111111", end: "#000000" }, detail: "Almost there! Keep trying!", type: "soClose", isBounce: true },
+                { text: "TRY AGAIN", colors: { start: "#111111", end: "#000000" }, detail: "Better luck next time!", type: "tryAgain" },
+                { text: "SO CLOSE!", colors: { start: "#111111", end: "#000000" }, detail: "Almost there! Keep trying!", type: "soClose", isBounce: true }
+            ];
+            this.exclusiveActiveSpinPrizes = [];
+            this.exclusiveSpinPrizePool = [];
             this.hostViewMode = 'grid';
             this.hostDashboardRole = 'host';
             this.currentSalaryEditId = null;
@@ -278,6 +401,7 @@
         async init() {
             this.setupCurrencyFormatting();
             const authFeedback = this.readAuthFeedbackFromUrl();
+            this.loadLocalBackupState();
             await this.restoreAuthenticatedSession();
             await this.syncFromCloud();
             this.render();
@@ -626,6 +750,7 @@
         getDefaultTeamMembers() { return []; }
 
         saveLocalData() {
+            this.saveLocalBackupState();
             this.render();
             if(document.getElementById('guestView').style.display === 'block') this.renderGuestGrid();
             this.scheduleRemoteSync(); 
@@ -651,6 +776,75 @@
                 phone: '',
                 password: 'demo-admin'
             };
+        }
+
+        getLocalBackupKey() {
+            return 'amada-engine-backup';
+        }
+
+        mergeRecordsByKey(primary, fallback, keyField = 'id') {
+            const merged = new Map();
+            [...(fallback || []), ...(primary || [])].forEach(item => {
+                if (!item) return;
+                const key = item[keyField];
+                if (!key) return;
+                merged.set(key, { ...merged.get(key), ...item });
+            });
+            return Array.from(merged.values());
+        }
+
+        saveLocalBackupState() {
+            try {
+                const payload = {
+                    inventory: this.inventory,
+                    transactions: this.transactions,
+                    expenditures: this.expenditures,
+                    refunds: this.refunds,
+                    salaryRegistry: this.salaryRegistry,
+                    rentRegistry: this.rentRegistry,
+                    otherIncome: this.otherIncome,
+                    checkedExpenseIds: Array.from(this.checkedExpenseIds || [])
+                };
+                localStorage.setItem(this.getLocalBackupKey(), JSON.stringify(payload));
+            } catch (error) {
+                console.warn('Local backup save failed:', error);
+            }
+        }
+
+        loadLocalBackupState() {
+            try {
+                const raw = localStorage.getItem(this.getLocalBackupKey());
+                if (!raw) return;
+                const payload = JSON.parse(raw);
+                this.inventory = Array.isArray(payload.inventory) && payload.inventory.length ? payload.inventory : this.inventory;
+                this.transactions = Array.isArray(payload.transactions) ? payload.transactions : this.transactions;
+                this.expenditures = Array.isArray(payload.expenditures) ? payload.expenditures : this.expenditures;
+                this.refunds = Array.isArray(payload.refunds) ? payload.refunds : this.refunds;
+                this.salaryRegistry = Array.isArray(payload.salaryRegistry) ? payload.salaryRegistry : this.salaryRegistry;
+                this.rentRegistry = Array.isArray(payload.rentRegistry) ? payload.rentRegistry : this.rentRegistry;
+                this.otherIncome = Array.isArray(payload.otherIncome) ? payload.otherIncome : this.otherIncome;
+                this.checkedExpenseIds = new Set(Array.isArray(payload.checkedExpenseIds) ? payload.checkedExpenseIds : []);
+            } catch (error) {
+                console.warn('Local backup load failed:', error);
+            }
+        }
+
+        mergeLocalBackupState() {
+            try {
+                const raw = localStorage.getItem(this.getLocalBackupKey());
+                if (!raw) return;
+                const payload = JSON.parse(raw);
+                this.transactions = this.mergeRecordsByKey(this.transactions, payload.transactions || [], 'id');
+                this.expenditures = this.mergeRecordsByKey(this.expenditures, payload.expenditures || [], 'id');
+                this.refunds = this.mergeRecordsByKey(this.refunds, payload.refunds || [], 'id');
+                this.salaryRegistry = this.mergeRecordsByKey(this.salaryRegistry, payload.salaryRegistry || [], 'id');
+                this.rentRegistry = this.mergeRecordsByKey(this.rentRegistry, payload.rentRegistry || [], 'id');
+                this.otherIncome = this.mergeRecordsByKey(this.otherIncome, payload.otherIncome || [], 'id');
+                const backupChecked = Array.isArray(payload.checkedExpenseIds) ? payload.checkedExpenseIds : [];
+                this.checkedExpenseIds = new Set([...(this.checkedExpenseIds || []), ...backupChecked]);
+            } catch (error) {
+                console.warn('Local backup merge failed:', error);
+            }
         }
 
         getHostsForPersistence() {
@@ -1282,7 +1476,9 @@
                     location: row.location,
                     amount: Number(row.amount) || 0,
                     phone: row.phone || '',
-                    email: row.email || ''
+                    email: row.email || '',
+                    assignedPropertyId: row.property_id || '',
+                    assignedPropertyName: row.property_name || ''
                 }));
 
                 this.rentRegistry = rentRows.map(row => ({
@@ -1317,6 +1513,8 @@
                     drawnAt: row.drawn_at
                 }));
 
+                this.mergeLocalBackupState();
+                this.saveLocalBackupState();
                 this.updateSyncUI('online');
             } catch (e) { 
                 this.updateSyncUI('offline');
@@ -1324,6 +1522,7 @@
                 if (!this.inventory.length) {
                     this.inventory = this.getInitialInventory();
                 }
+                this.mergeLocalBackupState();
             }
         }
 
@@ -1423,6 +1622,7 @@
             } catch (e) { 
                 this.updateSyncUI('offline');
                 console.warn(`Supabase save failed: ${e.message}`);
+                this.showNotification("Cloud sync failed. Your records are still kept locally on this device.", "error");
             }
         }
 
@@ -1668,7 +1868,7 @@
                         <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap; margin-bottom:20px;">
                             <div>
                                 <h3 style="margin:0 0 6px 0;"><i class="fa-solid fa-users-gear" style="color:var(--primary)"></i> Team Access Control</h3>
-                                <p style="margin:0; color:var(--gray);">Create staff, management, and chairman accounts, then switch into those dashboards from the top role selector.</p>
+                                <p style="margin:0; color:var(--gray);">Create staff, management, and executive accounts, then switch into those dashboards from the top role selector.</p>
                             </div>
                         </div>
                         <form id="teamMemberForm" onsubmit="event.preventDefault(); app.addTeamMember();" style="margin-bottom:24px;">
@@ -1678,7 +1878,7 @@
                                     <select id="teamMemberRole" onchange="app.refreshTeamMemberStaffId()" required>
                                         <option value="staff">Staff</option>
                                         <option value="management">Management</option>
-                                        <option value="chairman">Chairman</option>
+                                        <option value="chairman">Executive</option>
                                     </select>
                                     <label style="top:5px; font-size:0.7rem;">Position</label>
                                 </div>
@@ -1702,7 +1902,7 @@
                                 <div style="display:flex; justify-content:space-between; gap:16px; align-items:center; padding:18px 20px; border-bottom:1px solid #eee;">
                                     <div>
                                         <div style="font-weight:700;">${member.name}</div>
-                                        <div style="font-size:0.84rem; color:var(--gray);">${member.role.toUpperCase()} • ${member.staffId} • ${member.phone || 'No phone'}${member.email ? ` • ${member.email}` : ''}</div>
+                                        <div style="font-size:0.84rem; color:var(--gray);">${this.getDisplayRole(member.role).toUpperCase()} • ${String(member.staffId || '').toUpperCase()} • ${member.phone || 'No phone'}${member.email ? ` • ${member.email}` : ''}</div>
                                         <div style="font-size:0.8rem; color:var(--gray); margin-top:4px;">Assigned to ${member.assignmentLabel || 'Admin Office'}</div>
                                     </div>
                                     <div style="display:flex; gap:10px; flex-wrap:wrap;">
@@ -1741,7 +1941,7 @@
             const name = document.getElementById('teamMemberName').value.trim();
             const role = document.getElementById('teamMemberRole').value;
             const assignmentValue = document.getElementById('teamMemberAssignment').value;
-            const staffId = document.getElementById('teamMemberStaffId').value.trim();
+            const staffId = document.getElementById('teamMemberStaffId').value.trim().toUpperCase();
             const phone = document.getElementById('teamMemberPhone').value.trim();
             const email = document.getElementById('teamMemberEmail').value.trim();
             const pin = document.getElementById('teamMemberPin').value.trim();
@@ -1813,7 +2013,7 @@
                 .map(id => parseInt(id.split('-').pop(), 10))
                 .filter(num => !isNaN(num));
             const nextNumber = (existingNumbers.length ? Math.max(...existingNumbers) : 0) + 1;
-            input.value = `${prefix}-${String(nextNumber).padStart(3, '0')}`;
+            input.value = `${prefix}-${String(nextNumber).padStart(3, '0')}`.toUpperCase();
             refreshFloatingLabels();
         }
 
@@ -1859,6 +2059,18 @@
             }
 
             return cleaned.replace(/\s+/g, '').slice(0, maxLength) || 'team';
+        }
+
+        getDisplayRole(role) {
+            return role === 'chairman' ? 'Executive' : String(role || '');
+        }
+
+        isExecutiveApprovedStatus(status) {
+            return status === 'Approved for chairman' || status === 'Approved for executive';
+        }
+
+        getDisplayExpenseStatus(status) {
+            return this.isExecutiveApprovedStatus(status) ? 'Approved for Executive' : (status || 'Pending approval');
         }
 
         getHostNameByEmail(email) {
@@ -1952,6 +2164,40 @@
                 });
             };
 
+            const getWrappedLines = (text, maxWidth, options = {}) => {
+                const words = String(text || '').split(/\s+/).filter(Boolean);
+                const lines = [];
+                let line = '';
+                ctx.font = `${options.weight || '400'} ${options.size || 28}px ${options.font || 'Poppins, Arial, sans-serif'}`;
+                words.forEach(word => {
+                    const next = line ? `${line} ${word}` : word;
+                    if (ctx.measureText(next).width > maxWidth && line) {
+                        lines.push(line);
+                        line = word;
+                    } else {
+                        line = next;
+                    }
+                });
+                if (line) lines.push(line);
+                return lines.length ? lines : [''];
+            };
+
+            const drawFittedName = (text, x, y, maxWidth, maxLines = 2) => {
+                let size = 48;
+                let lines = [];
+                while (size >= 30) {
+                    lines = getWrappedLines(text, maxWidth, { size, weight: '700', font: 'Playfair Display, Georgia, serif' });
+                    if (lines.length <= maxLines) break;
+                    size -= 2;
+                }
+                const visibleLines = lines.slice(0, maxLines);
+                const lineHeight = size + 10;
+                visibleLines.forEach((line, index) => {
+                    writeText(line, x, y + (index * lineHeight), { size, weight: '700', color: '#161616', font: 'Playfair Display, Georgia, serif' });
+                });
+                return y + ((visibleLines.length - 1) * lineHeight);
+            };
+
             const gradient = ctx.createLinearGradient(0, 0, width, height);
             gradient.addColorStop(0, '#fff6f7');
             gradient.addColorStop(0.55, '#ffffff');
@@ -1994,13 +2240,13 @@
             writeText('Engine Staff ID', 95, 140, { size: 22, weight: '500', color: 'rgba(255,255,255,0.85)' });
             writeText(member.assignmentLabel || 'Admin Office', 95, 455, { size: 30, weight: '700', color: '#ffffff' });
             wrapText(property?.loc || 'Abuja, Nigeria', 95, 495, 250, 32, { size: 22, color: 'rgba(255,255,255,0.82)' });
-            writeText(member.staffId, 95, 585, { size: 32, weight: '700', color: '#ffe38a', font: 'monospace' });
-            writeText(String(member.role || '').toUpperCase(), 95, 625, { size: 22, weight: '700', color: '#ffffff' });
+            writeText(String(member.staffId || '').toUpperCase(), 95, 585, { size: 32, weight: '700', color: '#ffe38a', font: 'monospace' });
+            writeText(this.getDisplayRole(member.role).toUpperCase(), 95, 625, { size: 22, weight: '700', color: '#ffffff' });
 
             writeText('OFFICIAL STAFF PASS', 470, 130, { size: 18, weight: '700', color: accent });
-            wrapText(member.name, 470, 210, 600, 58, { size: 48, weight: '700', color: '#161616', font: 'Playfair Display, Georgia, serif' });
-            writeText(member.phone || 'No phone provided', 470, 250, { size: 24, color: '#555555' });
-            writeText(member.email || 'No email provided', 470, 285, { size: 24, color: '#555555' });
+            const nameBottomY = drawFittedName(member.name, 470, 210, 560, 2);
+            writeText(member.phone || 'No phone provided', 470, nameBottomY + 44, { size: 24, color: '#555555' });
+            writeText(member.email || 'No email provided', 470, nameBottomY + 79, { size: 24, color: '#555555' });
 
             ctx.fillStyle = '#f8f8f8';
             roundRect(470, 345, 620, 235, 28);
@@ -2011,7 +2257,7 @@
             writeText('Assigned Unit', 510, 395, { size: 18, weight: '700', color: '#888888' });
             wrapText(member.assignmentLabel || 'Admin Office', 510, 438, 520, 42, { size: 32, weight: '700', color: '#1f1f1f' });
             writeText('Role', 510, 505, { size: 18, weight: '700', color: '#888888' });
-            writeText(String(member.role || '').toUpperCase(), 510, 545, { size: 28, weight: '700', color: accent });
+            writeText(this.getDisplayRole(member.role).toUpperCase(), 510, 545, { size: 28, weight: '700', color: accent });
             writeText('Issued By', 860, 505, { size: 18, weight: '700', color: '#888888' });
             writeText(issuerName, 860, 545, { size: 24, weight: '600', color: '#1f1f1f' });
 
@@ -3076,7 +3322,8 @@
                 code: tx.accessCode || '',
                 phone: tx.phone || '',
                 email: tx.email || '',
-                date: tx.date || ''
+                date: tx.date || '',
+                reward: tx.reward || null
             };
         }
 
@@ -3134,6 +3381,13 @@
                                 <div style="text-align:right;"><div class="label">Email</div><div class="value" style="font-size:15px;">${data.email || 'N/A'}</div></div>
                             </div>
                         </div>
+                        ${data.reward ? `
+                            <div class="box" style="background:#fff7df; border-color:#f2d081;">
+                                <div class="label" style="color:#8a5a00;">Booking Reward</div>
+                                <div class="value" style="font-size:26px;">${data.reward.label}</div>
+                                <div class="sub" style="margin-top:8px; line-height:1.6;">${data.reward.detail || ''}</div>
+                            </div>
+                        ` : ''}
                         <div class="code">${data.code}</div>
                     </div>
                 </body>
@@ -3248,6 +3502,18 @@
             writeText(data.code || 'N/A', 600, 1135, { size: 76, weight: '700', color: '#ffd700', align: 'center', font: 'monospace' });
             writeText('Use this code to unlock the door during your stay.', 600, 1195, { size: 24, color: '#888888', align: 'center' });
 
+            if (data.reward?.label) {
+                ctx.fillStyle = '#fff7df';
+                radiusRect(120, 1255, 960, 180, 28, true);
+                ctx.strokeStyle = '#f2d081';
+                ctx.lineWidth = 2;
+                radiusRect(120, 1255, 960, 180, 28, false);
+                ctx.stroke();
+                writeText('BOOKING REWARD', 160, 1315, { size: 18, weight: '700', color: '#8a5a00' });
+                writeText(data.reward.label, 160, 1360, { size: 40, weight: '700', color: '#1a1a1a' });
+                writeText(data.reward.detail || '', 160, 1405, { size: 24, color: '#6d6257' });
+            }
+
             const link = document.createElement('a');
             link.download = `amada-receipt-${data.receiptNumber}.png`;
             link.href = canvas.toDataURL('image/png');
@@ -3269,6 +3535,1549 @@
                 return;
             }
             this.downloadReceiptImage(this.getTransactionReceiptData(tx));
+        }
+
+        populateReceiptModal(receiptData) {
+            this.currentReceiptData = receiptData;
+            document.getElementById('recGuest').innerText = receiptData.guest;
+            document.getElementById('recProp').innerText = receiptData.property;
+            document.getElementById('recIn').innerText = receiptData.checkIn;
+            document.getElementById('recOut').innerText = receiptData.checkOut;
+            document.getElementById('recTotal').innerText = this.formatCurrency(receiptData.total);
+            document.getElementById('recPaid').innerText = this.formatCurrency(receiptData.totalPaid);
+            document.getElementById('recBalance').innerText = this.formatCurrency(receiptData.balance);
+            document.getElementById('recCode').innerText = receiptData.code;
+
+            const rewardBox = document.getElementById('receiptRewardBox');
+            const rewardTitle = document.getElementById('recRewardTitle');
+            const rewardDetail = document.getElementById('recRewardDetail');
+            if (rewardBox && rewardTitle && rewardDetail) {
+                if (receiptData.reward?.label) {
+                    rewardBox.style.display = 'block';
+                    rewardTitle.innerText = receiptData.reward.label;
+                    rewardDetail.innerText = receiptData.reward.detail || '';
+                } else {
+                    rewardBox.style.display = 'none';
+                    rewardTitle.innerText = '';
+                    rewardDetail.innerText = '';
+                }
+            }
+        }
+
+        renderRewardLegend() {
+            const legend = document.getElementById('rewardLegend');
+            if (!legend) return;
+            legend.innerHTML = this.rewardPrizes.map(prize => `
+                <div class="reward-legend-item">
+                    <span class="reward-legend-swatch" style="background:${prize.color};"></span>
+                    <div><strong>${prize.label}</strong><br>${prize.detail}</div>
+                </div>
+            `).join('');
+        }
+
+        startGuestSalesTimers() {
+            const flashHeadline = document.getElementById('flashOfferHeadline');
+            const flashDetail = document.getElementById('flashOfferDetail');
+            const flashTimer = document.getElementById('flashOfferTimer');
+            const flashCaption = document.getElementById('flashOfferCaption');
+            const mealHeadline = document.getElementById('mealOfferHeadline');
+            const mealTimer = document.getElementById('mealOfferTimer');
+
+            if (!flashHeadline || !flashDetail || !flashTimer || !flashCaption || !mealHeadline || !mealTimer) {
+                return;
+            }
+
+            if (this.flashOfferInterval) clearInterval(this.flashOfferInterval);
+            if (this.mealOfferInterval) clearInterval(this.mealOfferInterval);
+
+            let flashSeconds = 35;
+            let flashPhase = 'phase1';
+            const renderFlash = () => {
+                if (flashPhase === 'phase1') {
+                    flashHeadline.innerText = '50% off if you book within 35 seconds.';
+                    flashDetail.innerText = 'When this ends, the next wave drops to 15% off for 13 seconds.';
+                    flashCaption.innerText = 'Phase 1 live now';
+                } else {
+                    flashHeadline.innerText = '15% off if you book within 13 seconds.';
+                    flashDetail.innerText = 'Short second-chance burst for guests still deciding.';
+                    flashCaption.innerText = 'Phase 2 live now';
+                }
+                flashTimer.innerText = formatPromoCountdown(flashSeconds);
+            };
+
+            renderFlash();
+            this.flashOfferInterval = setInterval(() => {
+                flashSeconds -= 1;
+                if (flashSeconds < 0) {
+                    if (flashPhase === 'phase1') {
+                        flashPhase = 'phase2';
+                        flashSeconds = 13;
+                    } else {
+                        flashPhase = 'phase1';
+                        flashSeconds = 35;
+                    }
+                }
+                renderFlash();
+            }, 1000);
+
+            const mealOffers = [
+                'Free lunch if you book within the next 5 minutes.',
+                'Free dinner if you book within the next 5 minutes.',
+                'Free drinks on us if you lock in your stay within the next 5 minutes.'
+            ];
+            let mealSeconds = 300;
+            let mealIndex = 0;
+            mealHeadline.innerText = mealOffers[mealIndex];
+            mealTimer.innerText = formatPromoCountdown(mealSeconds);
+
+            this.mealOfferInterval = setInterval(() => {
+                mealSeconds -= 1;
+                if (mealSeconds < 0) {
+                    mealSeconds = 300;
+                    mealIndex = (mealIndex + 1) % mealOffers.length;
+                    mealHeadline.innerText = mealOffers[mealIndex];
+                }
+                mealTimer.innerText = formatPromoCountdown(mealSeconds);
+            }, 1000);
+        }
+
+        formatExclusiveTime(seconds, includeHours = false) {
+            const safe = Math.max(0, seconds);
+            const m = Math.floor((safe % 3600) / 60);
+            const s = safe % 60;
+            if (includeHours) {
+                const h = Math.floor(safe / 3600);
+                return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            }
+            return `${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+        }
+
+        initExclusiveGuestPage() {
+            this.updateExclusiveHeroText(this.exclusiveCurrentSlide);
+            this.restartExclusiveHeroSlider();
+            this.restartExclusiveMasterTimer();
+            this.restartExclusiveSocialProof();
+            this.restartExclusiveWinnersTicker();
+            this.ensureExclusiveExitIntent();
+            this.ensureExclusiveSpinBindings();
+            this.populateExclusiveFilterOptions();
+            this.syncExclusiveControls();
+            this.renderExclusiveListings();
+            this.resizeExclusiveCanvas();
+        }
+
+        populateExclusiveFilterOptions() {
+            const available = this.inventory.filter(item => item.status === 'available');
+            const fillSelect = (id, items, label) => {
+                const select = document.getElementById(id);
+                if (!select) return;
+                const current = select.value || 'all';
+                select.innerHTML = `<option value="all">${label}</option>${items.map(item => `<option value="${item}">${item}</option>`).join('')}`;
+                select.value = items.includes(current) ? current : 'all';
+            };
+
+            fillSelect('guestExclusiveLocationFilter', [...new Set(available.map(item => item.loc).filter(Boolean))].sort(), 'All Locations');
+            fillSelect('guestExclusiveCityFilter', [...new Set(available.map(item => this.getPropertyCity(item)).filter(Boolean))].sort(), 'All Cities');
+            fillSelect('guestExclusiveStateFilter', [...new Set(available.map(item => this.getPropertyState(item)).filter(Boolean))].sort(), 'All States');
+        }
+
+        syncExclusiveControls() {
+            const setValue = (id, value) => {
+                const el = document.getElementById(id);
+                if (el) el.value = value;
+            };
+
+            setValue('guestExclusiveSearchInput', this.guestSearchQuery);
+            setValue('guestExclusiveRoomsFilter', this.guestFilters.rooms);
+            setValue('guestExclusivePriceRangeFilter', this.guestFilters.priceRange);
+            setValue('guestExclusiveLocationFilter', this.guestFilters.location);
+            setValue('guestExclusiveCityFilter', this.guestFilters.city);
+            setValue('guestExclusiveStateFilter', this.guestFilters.state);
+            setValue('guestExclusiveSortSelect', this.guestSortBy);
+
+            const activeClasses = ['bg-amada-red', 'text-white', 'shadow-sm'];
+            const idleClasses = ['text-gray-800'];
+            const buttons = [
+                { id: 'guestExclusiveBtnGrid', mode: 'grid' },
+                { id: 'guestExclusiveBtnList', mode: 'list' },
+                { id: 'guestExclusiveBtnMap', mode: 'map' }
+            ];
+
+            buttons.forEach(({ id, mode }) => {
+                const button = document.getElementById(id);
+                if (!button) return;
+                const isActive = this.guestViewMode === mode;
+                button.classList.remove(...activeClasses, ...idleClasses);
+                if (isActive) button.classList.add(...activeClasses);
+                else button.classList.add(...idleClasses);
+            });
+        }
+
+        updateExclusiveSearch(value) {
+            this.guestSearchQuery = value;
+            this.renderExclusiveListings();
+        }
+
+        submitExclusiveHeroSearch() {
+            const locationInput = document.getElementById('guestExclusiveHeroLocationInput');
+            const guestSelect = document.getElementById('guestExclusiveHeroGuestSelect');
+            const dateInput = document.getElementById('guestExclusiveHeroDateInput');
+            const query = locationInput?.value?.trim() || '';
+            const guestChoice = guestSelect?.value || '1 Guest';
+
+            this.guestSearchQuery = query;
+            this.guestViewMode = 'grid';
+
+            if (guestChoice === '3+ Guests') this.guestFilters.rooms = '2';
+            else if (guestChoice === '2 Guests') this.guestFilters.rooms = '1';
+            else this.guestFilters.rooms = 'all';
+
+            this.syncExclusiveControls();
+            this.renderExclusiveListings();
+
+            const resultsSection = document.getElementById('guestExclusiveListingsGrid');
+            resultsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+            const summaryParts = [];
+            if (query) summaryParts.push(query);
+            if (guestChoice) summaryParts.push(guestChoice);
+            if (dateInput?.value) summaryParts.push(new Date(dateInput.value).toLocaleDateString());
+            this.showNotification(summaryParts.length ? `Showing stays for ${summaryParts.join(' • ')}` : 'Showing all available stays.', 'success');
+        }
+
+        updateExclusiveFilter(key, value) {
+            this.guestFilters[key] = value;
+            this.renderExclusiveListings();
+        }
+
+        updateExclusiveSort(value) {
+            this.guestSortBy = value;
+            this.renderExclusiveListings();
+        }
+
+        resetExclusiveFilters() {
+            this.guestFilters = { rooms: 'all', priceRange: 'all', location: 'all', city: 'all', state: 'all' };
+            this.guestSortBy = 'default';
+            this.guestSearchQuery = '';
+            this.populateExclusiveFilterOptions();
+            this.syncExclusiveControls();
+            this.renderExclusiveListings();
+        }
+
+        toggleExclusiveView(mode) {
+            this.guestViewMode = mode;
+            this.syncExclusiveControls();
+            this.renderExclusiveListings();
+        }
+
+        getExclusiveListingMeta(prop, index) {
+            const rooms = this.getPropertyRoomCount(prop);
+            const viewers = 6 + ((index * 4) % 11);
+            const bookedPct = Math.min(96, 58 + ((index * 11) % 39));
+            const badgeSets = [
+                {
+                    primary: { cls: 'bg-amada-red text-white', text: 'High Demand', icon: 'fa-fire' },
+                    secondary: { cls: 'bg-white/95 text-red-600 border border-red-100', text: 'Only 1 unit left!' }
+                },
+                {
+                    primary: { cls: 'bg-amada-dark text-amada-gold', text: 'Premium', icon: 'fa-crown' },
+                    secondary: null
+                },
+                {
+                    primary: { cls: 'bg-white/90 backdrop-blur text-blue-600 border border-blue-200', text: 'Rare Find', icon: 'fa-gem' },
+                    secondary: null
+                }
+            ];
+            return {
+                rooms,
+                viewers,
+                bookedPct,
+                badges: badgeSets[index % badgeSets.length]
+            };
+        }
+
+        getExclusiveMarketingPerks() {
+            return [
+                { text: 'Free Night', icon: 'fa-moon', cls: 'bg-purple-50 text-purple-700 border border-purple-200' },
+                { text: '50% Off', icon: 'fa-tags', cls: 'bg-red-50 text-amada-red border border-red-200' },
+                { text: 'Free Rides', icon: 'fa-car-side', cls: 'bg-sky-50 text-sky-700 border border-sky-200' },
+                { text: 'Free Lunch', icon: 'fa-utensils', cls: 'bg-yellow-50 text-yellow-700 border border-yellow-200' },
+                { text: 'Late Checkout', icon: 'fa-clock', cls: 'bg-green-50 text-green-700 border border-green-200' }
+            ];
+        }
+
+        renderExclusiveListings() {
+            const container = document.getElementById('guestExclusiveListingsGrid');
+            const mapArea = document.getElementById('guestExclusiveMapArea');
+            if (!container) return;
+            const data = this.getFilteredGuestProperties();
+            this.syncExclusiveControls();
+            container.innerHTML = '';
+
+            if (this.guestViewMode === 'map') {
+                container.className = 'hidden';
+                if (mapArea) mapArea.classList.remove('hidden');
+                this.initExclusiveMap(data);
+                if (!data.length && mapArea) {
+                    mapArea.innerHTML = `<div class="h-full flex items-center justify-center text-center p-10 text-gray-500"><div><i class="fa-solid fa-map-location-dot text-5xl text-gray-300 mb-4"></i><h4 class="font-serif text-3xl font-bold text-gray-900 mb-3">No stays match these filters.</h4><p>Adjust your filters to repopulate the map.</p></div></div>`;
+                }
+                return;
+            }
+
+            container.className = this.guestViewMode === 'list'
+                ? 'grid grid-cols-1 gap-6'
+                : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10';
+            if (mapArea) mapArea.classList.add('hidden');
+
+            if (!data.length) {
+                container.innerHTML = `
+                    <div class="col-span-full bg-white border border-gray-200 rounded-3xl p-12 text-center shadow-sm">
+                        <i class="fa-solid fa-house-circle-xmark text-5xl text-gray-300 mb-4"></i>
+                        <h4 class="font-serif text-3xl font-bold text-gray-900 mb-3">No coded stays available right now.</h4>
+                        <p class="text-gray-500 font-medium">Once properties are available in the database, they will appear here automatically.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            data.forEach((prop, index) => {
+                const meta = this.getExclusiveListingMeta(prop, index);
+                const promoPerks = this.getExclusiveMarketingPerks();
+                const img = Array.isArray(prop.images) && prop.images.length
+                    ? prop.images[0]
+                    : 'https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80';
+                const card = document.createElement('div');
+                card.className = `listing-card rounded-2xl overflow-hidden border border-gray-200 relative group cursor-pointer shadow-lg flex flex-col ${this.guestViewMode === 'list' ? 'list-mode' : ''}`;
+                card.onclick = () => this.openExclusivePropertyDetails(prop.id);
+                card.innerHTML = `
+                    <div class="absolute top-4 left-4 z-10 flex flex-col gap-2">
+                        <span class="${meta.badges.primary.cls} text-xs font-black px-3 py-1.5 rounded shadow-lg uppercase tracking-wider"><i class="fa-solid ${meta.badges.primary.icon} mr-1"></i> ${meta.badges.primary.text}</span>
+                        ${meta.badges.secondary ? `<span class="${meta.badges.secondary.cls} text-[11px] font-extrabold px-3 py-1 rounded shadow uppercase">${meta.badges.secondary.text}</span>` : ''}
+                    </div>
+                    <div class="absolute top-4 right-4 z-10">
+                        <button class="w-10 h-10 rounded-full bg-white/80 backdrop-blur flex items-center justify-center text-gray-400 hover:text-amada-red transition shadow"><i class="fa-solid fa-heart text-lg"></i></button>
+                    </div>
+                    <div class="guest-exclusive-media h-72 overflow-hidden bg-gray-100">
+                        <img src="${img}" alt="${prop.name}" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
+                    </div>
+                    <div class="guest-exclusive-card-body p-6 flex-grow flex flex-col">
+                        <div class="guest-exclusive-card-header flex justify-between items-start mb-1">
+                            <h4 class="font-serif text-2xl font-bold text-gray-900">${prop.name}</h4>
+                            <span class="flex items-center text-gray-900 text-sm font-black bg-yellow-100 px-2 py-0.5 rounded"><i class="fa-solid fa-star text-amada-gold mr-1"></i> ${(4.8 + ((index % 3) * 0.07)).toFixed(2)}</span>
+                        </div>
+                        <p class="guest-exclusive-card-location text-gray-500 text-sm mb-4 font-medium">${prop.loc} • ${Math.max(2, roomsToGuests(meta.rooms))} Guests • ${roomsLabel(meta.rooms)}</p>
+                        <div class="guest-exclusive-card-perks flex flex-wrap gap-2 mb-4">
+                            <span class="bg-green-50 text-xs text-green-700 font-bold px-2.5 py-1 rounded border border-green-200"><i class="fa-solid fa-rotate-left mr-1"></i> 100% Refundable</span>
+                            <span class="bg-blue-50 text-xs text-blue-700 font-bold px-2.5 py-1 rounded border border-blue-200"><i class="fa-solid fa-shield-halved mr-1"></i> Free Protection</span>
+                            ${promoPerks.map(perk => `
+                                <span class="${perk.cls} text-xs font-bold px-2.5 py-1 rounded"><i class="fa-solid ${perk.icon} mr-1"></i> ${perk.text}</span>
+                            `).join('')}
+                        </div>
+                        <div class="guest-exclusive-card-meta mb-5 mt-auto">
+                            <div class="flex justify-between text-[10px] font-black uppercase text-gray-500 mb-1">
+                                <span>Availability</span>
+                                <span class="${meta.bookedPct > 85 ? 'text-amada-red' : 'text-yellow-600'}">${meta.bookedPct}% Booked</span>
+                            </div>
+                            <div class="w-full bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                                <div class="${meta.bookedPct > 85 ? 'shimmer-bg animate-shimmer' : 'bg-yellow-500'} h-1.5 rounded-full" style="width: ${meta.bookedPct}%"></div>
+                            </div>
+                        </div>
+                        <div class="guest-exclusive-card-footer flex justify-between items-end border-t border-gray-100 pt-5">
+                            <div>
+                                <p class="text-gray-400 text-xs line-through font-bold">${this.formatCurrency(Math.round((Number(prop.price) || 0) * 1.25))}</p>
+                                <p class="text-2xl font-black text-amada-red">${this.formatCurrency(prop.price)} <span class="text-sm font-medium text-gray-500">/night</span></p>
+                            </div>
+                            <button class="bg-amada-dark text-white font-bold py-2.5 px-6 rounded-lg hover:bg-amada-gold transition shadow-md">Reserve</button>
+                        </div>
+                    </div>
+                    <div class="${meta.bookedPct > 85 ? 'bg-red-50 text-amada-red border-red-100' : 'bg-gray-50 text-gray-600 border-gray-200'} text-xs text-center py-2.5 font-bold border-t uppercase tracking-wide">
+                        <i class="fa-solid ${meta.bookedPct > 85 ? 'fa-eye animate-pulse' : 'fa-clock'} mr-1"></i> ${meta.bookedPct > 85 ? `${meta.viewers} people are viewing this right now` : 'Last booked recently'}
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            function roomsLabel(rooms) {
+                if (rooms === 0) return 'Studio';
+                return `${rooms} Bedroom${rooms > 1 ? 's' : ''}`;
+            }
+
+            function roomsToGuests(rooms) {
+                if (rooms === 0) return 2;
+                return rooms * 2;
+            }
+        }
+
+        initExclusiveMap(data = this.getFilteredGuestProperties()) {
+            const elementId = 'guestExclusiveMapArea';
+            const area = document.getElementById(elementId);
+            if (!area || typeof L === 'undefined') return;
+
+            if (!this.exclusiveGuestMapInstance) {
+                this.exclusiveGuestMapInstance = L.map(elementId, { zoomControl: true }).setView([9.0765, 7.3986], 12);
+                this.addBaseTileLayer(this.exclusiveGuestMapInstance);
+            }
+
+            if (this.exclusiveGuestMapMarkers) {
+                this.exclusiveGuestMapMarkers.forEach(marker => marker.remove());
+            }
+            this.exclusiveGuestMapMarkers = [];
+
+            const validCoords = data.filter(prop => prop.coords && !isNaN(parseFloat(prop.coords.lat)) && !isNaN(parseFloat(prop.coords.lng)));
+            validCoords.forEach(prop => {
+                const lat = parseFloat(prop.coords.lat);
+                const lng = parseFloat(prop.coords.lng);
+                const marker = L.marker([lat, lng]).addTo(this.exclusiveGuestMapInstance);
+                marker.bindPopup(`
+                    <div style="min-width:180px;">
+                        <strong style="display:block; margin-bottom:6px; font-size:1rem;">${prop.name}</strong>
+                        <div style="color:#D32F2F; font-weight:700; margin-bottom:10px;">${this.formatCurrency(prop.price)} / night</div>
+                        <div style="font-size:0.85rem; color:#6b7280; margin-bottom:12px;">${prop.loc}</div>
+                        <button class="btn-primary" style="width:100%; justify-content:center; padding:10px 14px;" onclick="window.app.openExclusivePropertyDetails('${prop.id}')">View & Reserve</button>
+                    </div>
+                `);
+                this.exclusiveGuestMapMarkers.push(marker);
+            });
+
+            if (validCoords.length) {
+                const bounds = L.latLngBounds(validCoords.map(prop => [parseFloat(prop.coords.lat), parseFloat(prop.coords.lng)]));
+                this.exclusiveGuestMapInstance.fitBounds(bounds.pad(0.18));
+            } else {
+                this.exclusiveGuestMapInstance.setView([9.0765, 7.3986], 12);
+            }
+
+            setTimeout(() => this.exclusiveGuestMapInstance.invalidateSize(), 120);
+        }
+
+        openExclusivePropertyDetails(id) {
+            const prop = this.inventory.find(item => item.id === id);
+            if (!prop) return;
+
+            this.exclusiveSelectedPropertyId = prop.id;
+            document.getElementById('pdName').innerText = prop.name;
+            document.getElementById('pdLoc').innerText = prop.loc;
+            document.getElementById('pdType').innerText = this.getExclusivePropertyTypeLabel(prop);
+            document.getElementById('pdPrice').innerText = this.formatCurrency(prop.price);
+
+            let images = Array.isArray(prop.images) ? prop.images.filter(Boolean) : [];
+            if (!images.length) images = ['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80'];
+            const slidesHtml = images.map(img => `<div class="carousel-slide" style="background-image:url('${img}')"></div>`).join('');
+            document.getElementById('pdCarousel').innerHTML = `
+                ${images.length > 1 ? `<button class="carousel-btn prev" style="left:20px; width:40px; height:40px;" onclick="app.slideCarousel(event, -1)"><i class="fa-solid fa-chevron-left"></i></button>` : ''}
+                <div class="carousel-track">${slidesHtml}</div>
+                ${images.length > 1 ? `<button class="carousel-btn next" style="right:20px; width:40px; height:40px;" onclick="app.slideCarousel(event, 1)"><i class="fa-solid fa-chevron-right"></i></button>` : ''}
+            `;
+
+            const amenities = this.normalizeAmenities(prop.amenities);
+            document.getElementById('pdAmenities').innerHTML = amenities.map(item =>
+                `<div class="amenity-tag"><i class="fa-solid ${item.icon || 'fa-check'}" style="color:var(--primary)"></i> ${item.text || ''}</div>`
+            ).join('');
+            const promoPerks = this.getExclusiveMarketingPerks();
+            const perksEl = document.getElementById('pdPerks');
+            if (perksEl) {
+                perksEl.innerHTML = promoPerks.map(item =>
+                    `<div class="amenity-tag"><i class="fa-solid ${item.icon}" style="color:var(--primary)"></i> ${item.text}</div>`
+                ).join('');
+            }
+
+            const narrative = document.getElementById('pdDescription');
+            if (narrative) {
+                narrative.innerText = this.getExclusivePropertyDescription(prop);
+            }
+
+            const bookBtn = document.getElementById('pdBookBtn');
+            if (bookBtn) {
+                bookBtn.disabled = false;
+                bookBtn.innerHTML = '<i class="fa-solid fa-calendar-check"></i> Book This Stay';
+                bookBtn.onclick = () => {
+                    const detailsModal = document.getElementById('propDetailsModal');
+                    if (detailsModal) {
+                        detailsModal.classList.remove('show');
+                        setTimeout(() => {
+                            detailsModal.style.display = 'none';
+                            this.openExclusiveBookingModal(prop.name, this.formatCurrency(prop.price));
+                        }, 300);
+                    } else {
+                        this.openExclusiveBookingModal(prop.name, this.formatCurrency(prop.price));
+                    }
+                };
+            }
+
+            document.getElementById('propDetailsModal').style.display = 'flex';
+            setTimeout(() => {
+                document.getElementById('propDetailsModal').classList.add('show');
+                this.initDetailsMap(prop.coords || { lat: 9.0765, lng: 7.3986 }, prop.name);
+            }, 300);
+        }
+
+        getExclusivePropertyTypeLabel(prop) {
+            const rooms = this.getPropertyRoomCount(prop);
+            if (rooms === 0) return 'Studio';
+            return `${rooms} Bed`;
+        }
+
+        getExclusivePropertyDescription(prop) {
+            if (prop.description) return prop.description;
+            const rooms = this.getPropertyRoomCount(prop);
+            const guestCount = rooms === 0 ? 2 : rooms * 2;
+            return `${prop.name} delivers a refined private-stay experience in ${prop.loc}, built for ${guestCount} guest${guestCount > 1 ? 's' : ''}. Expect curated comfort, strong privacy, premium finishes, and the kind of atmosphere that makes short stays feel indulgent.`;
+        }
+
+        updateExclusiveHeroText(index) {
+            const data = this.exclusiveHeroSlides[index];
+            const container = document.getElementById('guestExclusiveHeroTextContainer');
+            if (!container || !data) return;
+            container.innerHTML = `
+                <h2 class="font-serif text-5xl md:text-7xl font-black text-gray-900 leading-tight mb-4 drop-shadow-sm animate-slide-in">
+                    ${data.title.replace('Absolute Best', '<span class="text-amada-red">Absolute Best</span>')}
+                </h2>
+                <p class="text-lg md:text-2xl text-gray-700 mb-8 font-medium animate-slide-in" style="animation-delay: 0.1s; animation-fill-mode: both;">
+                    ${data.subtitle}
+                </p>
+                <div class="bg-white/90 backdrop-blur border-l-4 border-amada-gold p-4 rounded-r-xl shadow-lg inline-block animate-slide-in" style="animation-delay: 0.2s; animation-fill-mode: both;">
+                    <p class="text-xs font-bold text-gray-500 uppercase tracking-widest mb-1">${data.perkTitle}</p>
+                    <p class="text-2xl md:text-3xl font-black text-amada-gold flex items-center gap-3">
+                        <i class="fa-solid ${data.perkIcon}"></i> ${data.perkHighlight}
+                    </p>
+                </div>
+            `;
+        }
+
+        restartExclusiveHeroSlider() {
+            if (this.exclusiveHeroInterval) clearInterval(this.exclusiveHeroInterval);
+            this.exclusiveHeroInterval = setInterval(() => {
+                const slides = document.querySelectorAll('#guestExclusivePage .slide');
+                if (!slides.length) return;
+                slides[this.exclusiveCurrentSlide]?.classList.remove('active');
+                this.exclusiveCurrentSlide = (this.exclusiveCurrentSlide + 1) % slides.length;
+                slides[this.exclusiveCurrentSlide]?.classList.add('active');
+                this.updateExclusiveHeroText(this.exclusiveCurrentSlide);
+            }, 6000);
+        }
+
+        restartExclusiveMasterTimer() {
+            const discountEl = document.getElementById('guestExclusiveCountdownTimer');
+            const heroVipEl = document.getElementById('guestExclusiveHeroVipTimer');
+            const bannerText = document.getElementById('guestExclusiveBannerText');
+            const banner = document.getElementById('guestExclusiveTopBanner');
+            if (!discountEl || !heroVipEl || !bannerText || !banner) return;
+
+            this.exclusiveDiscountPhase = 1;
+            this.exclusiveDiscountTimeLeft = 35;
+            this.exclusiveHeroVipTimeLeft = 225;
+            this.exclusivePerkDurations = [45, 75, 105, 135, 165, 195, 225];
+            this.exclusivePerkLost = [false, false, false, false, false, false, false];
+            this.exclusiveBookingConfirmed = false;
+            discountEl.style.display = '';
+            discountEl.classList.remove('text-gray-900');
+            discountEl.classList.add('text-amada-red');
+            banner.classList.add('urgency-banner-red', 'border-red-900');
+            banner.classList.remove('bg-gray-900', 'bg-black');
+            bannerText.innerHTML = 'FLASH SALE: Claim 50% OFF your stay. Price jumps in:';
+            discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
+            heroVipEl.innerText = this.formatExclusiveTime(this.exclusiveHeroVipTimeLeft);
+            heroVipEl.classList.remove('text-gray-400');
+            heroVipEl.classList.add('text-amada-red');
+            heroVipEl.parentElement?.parentElement?.classList.remove('opacity-50');
+            this.updateExclusivePerkHighlights();
+            this.updateExclusiveDynamicTexts();
+            this.prepareExclusiveSpinPrizes();
+
+            if (this.exclusiveMasterTimerInterval) clearInterval(this.exclusiveMasterTimerInterval);
+            this.exclusiveMasterTimerInterval = setInterval(() => {
+                if (this.exclusiveDiscountTimeLeft > 0) {
+                    this.exclusiveDiscountTimeLeft--;
+                } else if (this.exclusiveDiscountPhase === 1) {
+                    this.exclusiveDiscountPhase = 2;
+                    this.exclusiveDiscountTimeLeft = 13;
+                    bannerText.innerHTML = "CHALLENGE FAILED. <span class='text-red-200'>New Offer:</span> Claim 15% OFF in:";
+                    banner.classList.remove('urgency-banner-red', 'border-red-900');
+                    banner.classList.add('bg-gray-900');
+                    discountEl.classList.remove('text-amada-red');
+                    discountEl.classList.add('text-gray-900');
+                } else {
+                    bannerText.innerHTML = 'OFFERS EXPIRED. Standard rates apply.';
+                    discountEl.style.display = 'none';
+                    banner.classList.remove('bg-gray-900');
+                    banner.classList.add('bg-black');
+                }
+
+                if (discountEl.style.display !== 'none') {
+                    discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
+                }
+
+                if (this.exclusiveHeroVipTimeLeft > 0) {
+                    this.exclusiveHeroVipTimeLeft--;
+                    heroVipEl.innerText = this.formatExclusiveTime(this.exclusiveHeroVipTimeLeft);
+                } else {
+                    heroVipEl.innerText = '00:00';
+                    heroVipEl.classList.remove('text-amada-red');
+                    heroVipEl.classList.add('text-gray-400');
+                    heroVipEl.parentElement?.parentElement?.classList.add('opacity-50');
+                }
+
+                const bookingOpen = document.getElementById('guestExclusiveBookingModal')?.classList.contains('show');
+                const perkStep = bookingOpen ? 2 : 1;
+                let anyUpdate = false;
+                for (let step = 0; step < perkStep; step++) {
+                    anyUpdate = this.advanceExclusivePerkTimers() || anyUpdate;
+                }
+                this.renderExclusiveBookingPerks();
+
+                if (anyUpdate) {
+                    this.updateExclusivePerkHighlights();
+                    this.updateExclusiveDynamicTexts();
+                }
+
+                const modalCountdown = document.getElementById('guestExclusiveModalCountdown');
+                const maxTimeLeft = Math.max(...this.exclusivePerkDurations);
+                if (modalCountdown) {
+                    modalCountdown.innerText = maxTimeLeft > 0 ? this.formatExclusiveTime(maxTimeLeft) : 'EXPIRED';
+                }
+            }, 1000);
+        }
+
+        crossOutExclusivePerk(index) {
+            const perkEl = document.getElementById(`guestExclusivePerk${index + 1}`);
+            const timerEl = document.getElementById(`guestExclusiveTimer${index + 1}`);
+            if (!perkEl || !timerEl) return;
+
+            perkEl.className = 'flex justify-between items-center bg-red-50 border border-red-100 p-2 rounded-xl transition-all duration-300 opacity-50 scale-[0.98]';
+            const titleEl = perkEl.querySelector('span:first-child');
+            if (titleEl) {
+                titleEl.className = 'text-[11px] font-bold text-red-800 flex items-center gap-2 line-through decoration-red-500 decoration-2';
+                const icon = titleEl.querySelector('i');
+                if (icon) {
+                    icon.classList.remove('text-green-600');
+                    icon.classList.add('text-red-500');
+                }
+            }
+            timerEl.className = 'font-mono text-[11px] font-black text-red-700 bg-red-100 px-2 py-0.5 rounded border border-red-200 shadow-sm';
+            timerEl.innerText = 'LOST';
+        }
+
+        advanceExclusivePerkTimers() {
+            let anyUpdate = false;
+            for (let i = 0; i < this.exclusivePerkDurations.length; i++) {
+                if (this.exclusivePerkDurations[i] > 0) {
+                    this.exclusivePerkDurations[i]--;
+                    const timerEl = document.getElementById(`guestExclusiveTimer${i + 1}`);
+                    if (timerEl) timerEl.innerText = this.formatExclusiveTime(this.exclusivePerkDurations[i]);
+                } else if (!this.exclusivePerkLost[i]) {
+                    this.exclusivePerkLost[i] = true;
+                    this.crossOutExclusivePerk(i);
+                    anyUpdate = true;
+                }
+            }
+            return anyUpdate;
+        }
+
+        updateExclusivePerkHighlights() {
+            let activeFound = false;
+            for (let i = 0; i < this.exclusivePerkLost.length; i++) {
+                const perkEl = document.getElementById(`guestExclusivePerk${i + 1}`);
+                if (!perkEl || this.exclusivePerkLost[i]) continue;
+                perkEl.classList.remove('border-green-500', 'shadow-[0_0_12px_rgba(34,197,94,0.4)]', 'scale-[1.02]', 'border-green-100', 'scale-100');
+                if (!activeFound) {
+                    perkEl.classList.add('border-green-500', 'shadow-[0_0_12px_rgba(34,197,94,0.4)]', 'scale-[1.02]');
+                    activeFound = true;
+                } else {
+                    perkEl.classList.add('border-green-100', 'scale-100');
+                }
+            }
+            const giftIcon = document.getElementById('guestExclusiveGiftIconAnim');
+            if (giftIcon) {
+                giftIcon.classList.toggle('animate-pulse', activeFound);
+            }
+        }
+
+        updateExclusiveDynamicTexts() {
+            const survivingCount = this.exclusivePerkLost.filter(lost => !lost).length;
+            const label = document.getElementById('guestExclusivePerkBoxLabel');
+            const notice = document.getElementById('guestExclusiveFlightRiskText');
+            const checkbox = document.getElementById('guestExclusivePerkBox');
+
+            if (survivingCount > 0) {
+                if (label) label.innerText = `Yes, apply my ${survivingCount} remaining VIP perk${survivingCount > 1 ? 's' : ''} to this booking.`;
+                if (notice) notice.innerHTML = `<strong class="font-black text-amada-red">High Flight Risk!</strong> Another guest is viewing these dates. Complete your booking now to secure your stay and your <strong class="underline decoration-2">remaining ${survivingCount} perk${survivingCount > 1 ? 's' : ''}.</strong>`;
+            } else {
+                if (label) label.innerText = 'I understand all VIP perks have expired.';
+                if (checkbox) checkbox.checked = false;
+                if (notice) notice.innerHTML = '<strong class="font-black text-amada-red">All Perks Expired.</strong> Secure your dates before standard pricing increases.';
+            }
+            this.renderExclusiveBookingPerks();
+        }
+
+        renderExclusiveBookingPerks() {
+            const container = document.getElementById('guestExclusiveBookingPerksList');
+            if (!container) return;
+
+            const livePerks = this.exclusivePerkPrizeDefinitions
+                .map((perk, index) => ({ perk, index, lost: this.exclusivePerkLost[index], timeLeft: this.exclusivePerkDurations[index] }))
+                .filter(item => !item.lost);
+
+            if (!livePerks.length) {
+                container.innerHTML = `<div class="md:col-span-2 text-sm font-semibold text-gray-500 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">All timed perks have expired for this booking window.</div>`;
+                return;
+            }
+
+            container.innerHTML = livePerks.map(item => `
+                <div class="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2.5">
+                    <span class="text-[12px] font-black text-amber-900 uppercase tracking-wide">${item.perk.text}</span>
+                    <span class="font-mono text-[12px] font-black text-amada-red bg-white px-2.5 py-1 rounded-lg border border-amber-100">${this.formatExclusiveTime(item.timeLeft)}</span>
+                </div>
+            `).join('');
+        }
+
+        prepareExclusiveSpinPrizes() {
+            let active = this.exclusivePerkPrizeDefinitions
+                .filter((_, index) => !this.exclusivePerkLost[index])
+                .map(item => ({ ...item }));
+
+            if (!active.length) {
+                active = this.exclusiveBasicPerkPrizeDefinitions.map(item => ({ ...item }));
+            }
+
+            this.exclusiveActiveSpinPrizes = active;
+
+            const pool = [];
+            if (active.length) {
+                active.forEach((item, index) => {
+                    pool.push(item);
+                    const losing = this.exclusiveLosingSpinPrizes[index % this.exclusiveLosingSpinPrizes.length];
+                    pool.push({ ...losing });
+                });
+                while (pool.length < 12) {
+                    const losing = this.exclusiveLosingSpinPrizes[pool.length % this.exclusiveLosingSpinPrizes.length];
+                    pool.push({ ...losing });
+                }
+            } else {
+                while (pool.length < 8) {
+                    const losing = this.exclusiveLosingSpinPrizes[pool.length % this.exclusiveLosingSpinPrizes.length];
+                    pool.push({ ...losing });
+                }
+            }
+
+            this.exclusiveSpinPrizePool = pool;
+            this.renderExclusiveEligiblePerks();
+        }
+
+        renderExclusiveEligiblePerks() {
+            const container = document.getElementById('guestExclusiveEligiblePerksList');
+            if (!container) return;
+            if (!this.exclusiveActiveSpinPrizes.length) {
+                container.innerHTML = `<span class="text-xs font-bold text-gray-500">No live perks survived. This spin is currently a recovery chance only.</span>`;
+                return;
+            }
+            container.innerHTML = this.exclusiveActiveSpinPrizes.map(item => `
+                <span class="bg-yellow-50 text-amada-dark text-[11px] font-black px-2.5 py-1.5 rounded-full border border-yellow-200 uppercase tracking-wide">${item.text}</span>
+            `).join('');
+        }
+
+        restartExclusiveSocialProof() {
+            if (this.exclusiveSocialProofInterval) clearInterval(this.exclusiveSocialProofInterval);
+            this.createExclusiveToast();
+            this.exclusiveSocialProofInterval = setInterval(() => this.createExclusiveToast(), 10000);
+        }
+
+        createExclusiveToast() {
+            const container = document.getElementById('guestExclusiveToastContainer');
+            if (!container) return;
+            const name = this.exclusiveToastNames[Math.floor(Math.random() * this.exclusiveToastNames.length)];
+            const loc = this.exclusiveToastLocations[Math.floor(Math.random() * this.exclusiveToastLocations.length)];
+            const action = this.exclusiveToastActions[Math.floor(Math.random() * this.exclusiveToastActions.length)];
+            const toast = document.createElement('div');
+            toast.className = 'bg-white border border-gray-200 rounded-xl p-4 shadow-xl flex items-center gap-4 animate-slide-in max-w-sm';
+            toast.innerHTML = `
+                <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center text-amada-red font-bold flex-shrink-0 border border-red-100">
+                    <i class="fa-solid fa-bell text-xl animate-pulse"></i>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-900 font-bold">${name} from ${loc}</p>
+                    <p class="text-xs font-black text-amada-red">${action}</p>
+                    <p class="text-[10px] font-bold text-gray-400 mt-1 uppercase tracking-widest">Just now</p>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.classList.remove('animate-slide-in');
+                toast.classList.add('animate-slide-out');
+                setTimeout(() => toast.remove(), 500);
+            }, 5000);
+        }
+
+        restartExclusiveWinnersTicker() {
+            if (this.exclusiveLiveWinnersInterval) clearInterval(this.exclusiveLiveWinnersInterval);
+            const list = document.getElementById('guestExclusiveLiveWinnersList');
+            if (!list) return;
+            this.exclusiveLiveWinnersInterval = setInterval(() => {
+                const first = list.firstElementChild;
+                if (!first) return;
+                list.style.transition = 'transform 0.5s ease';
+                list.style.transform = 'translateY(-36px)';
+                setTimeout(() => {
+                    list.style.transition = 'none';
+                    list.appendChild(first);
+                    list.style.transform = 'translateY(0)';
+                }, 500);
+            }, 3500);
+        }
+
+        ensureExclusiveExitIntent() {
+            if (this.exclusiveGuestInitialized) return;
+            document.addEventListener('mouseout', (e) => {
+                if (e.clientY >= 20 || this.exclusiveHasTriggeredExit || this.exclusiveBookingConfirmed) return;
+                const booking = document.getElementById('guestExclusiveBookingModal');
+                const spin = document.getElementById('guestExclusiveSpinModal');
+                const prize = document.getElementById('guestExclusivePrizeModal');
+                if (booking?.classList.contains('show') || spin?.classList.contains('show') || prize?.classList.contains('show')) return;
+                if (document.getElementById('guestView')?.style.display !== 'block') return;
+                this.exclusiveHasTriggeredExit = true;
+                document.getElementById('guestExclusiveExitModal')?.classList.add('show');
+            });
+            ['guestExclusiveBookingModal', 'guestExclusiveSpinModal', 'guestExclusivePrizeModal', 'guestExclusiveExitModal', 'propDetailsModal'].forEach(id => {
+                const modal = document.getElementById(id);
+                if (!modal) return;
+                modal.addEventListener('mousedown', (event) => {
+                    if (event.target !== modal) return;
+                    if (id === 'guestExclusiveBookingModal') this.closeExclusiveBookingModal();
+                    else if (id === 'guestExclusiveSpinModal') this.closeExclusiveSpinModal();
+                    else if (id === 'guestExclusivePrizeModal') this.closeExclusivePrizeModal();
+                    else if (id === 'guestExclusiveExitModal') this.closeExclusiveExitModal();
+                    else this.closeModal();
+                });
+            });
+            window.addEventListener('resize', () => this.resizeExclusiveCanvas());
+            this.exclusiveGuestInitialized = true;
+        }
+
+        claimExclusiveExitOffer() {
+            this.closeExclusiveExitModal();
+            const widget = document.getElementById('guestExclusiveSearchWidget');
+            if (!widget) return;
+            widget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                widget.style.transform = 'scale(1.03)';
+                widget.style.boxShadow = '0 0 50px rgba(211,47,47,0.4)';
+                widget.style.borderColor = '#D32F2F';
+                setTimeout(() => {
+                    widget.style.transform = 'scale(1)';
+                    widget.style.boxShadow = '';
+                    widget.style.borderColor = 'white';
+                }, 1000);
+            }, 600);
+        }
+
+        closeExclusiveExitModal() {
+            document.getElementById('guestExclusiveExitModal')?.classList.remove('show');
+        }
+
+        openExclusiveBookingModal(title, price) {
+            const selected = this.exclusiveSelectedPropertyId
+                ? this.inventory.find(item => item.id === this.exclusiveSelectedPropertyId)
+                : this.inventory.find(item => item.name === title);
+            if (selected) this.exclusiveSelectedPropertyId = selected.id;
+            document.getElementById('guestExclusiveBookingTitle').innerText = title;
+            document.getElementById('guestExclusiveBookingPrice').innerText = `${price} / night`;
+            document.getElementById('guestExclusiveBookingInfoTitle').innerText = title;
+            document.getElementById('guestExclusiveBookingInfoPrice').innerText = `${price} / night`;
+            const todayIso = this.getTodayIsoDate();
+            const tomorrow = new Date(todayIso);
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            const checkIn = document.getElementById('guestExclusiveCheckInDate');
+            const checkOut = document.getElementById('guestExclusiveCheckOutDate');
+            if (checkIn && checkOut) {
+                checkIn.min = todayIso;
+                checkOut.min = todayIso;
+                checkIn.value = todayIso;
+                checkOut.value = tomorrow.toISOString().split('T')[0];
+            }
+            const clearValue = id => {
+                const field = document.getElementById(id);
+                if (field) field.value = '';
+            };
+            clearValue('guestExclusiveName');
+            clearValue('guestExclusivePhone');
+            clearValue('guestExclusiveEmail');
+            this.setCurrencyInputValue('guestExclusiveCautionFeePaid', 0);
+            this.exclusivePendingTransactionId = null;
+            document.getElementById('guestExclusiveBookingModal')?.classList.add('show');
+            document.getElementById('guestExclusiveBookingPerksDock')?.classList.remove('hidden');
+            this.startExclusiveModalTimer();
+            this.renderExclusiveBookingPerks();
+            this.calcExclusiveTotal();
+        }
+
+        closeExclusiveBookingModal() {
+            document.getElementById('guestExclusiveBookingModal')?.classList.remove('show');
+            document.getElementById('guestExclusiveBookingPerksDock')?.classList.add('hidden');
+            this.stopExclusiveModalTimer();
+        }
+
+        startExclusiveModalTimer() {
+            const countdown = document.getElementById('guestExclusiveModalCountdown');
+            const modalBox = document.getElementById('guestExclusiveModalBox');
+            if (!countdown || !modalBox) return;
+            this.exclusiveModalTimeLeft = Math.max(...this.exclusivePerkDurations);
+            countdown.innerText = this.exclusiveModalTimeLeft > 0 ? this.formatExclusiveTime(this.exclusiveModalTimeLeft) : 'EXPIRED';
+            countdown.classList.remove('text-amada-red');
+            countdown.classList.add('text-amada-gold');
+            modalBox.classList.remove('border-red-500', 'shadow-[0_0_50px_rgba(211,47,47,0.5)]');
+            this.updateExclusiveDynamicTexts();
+            if (this.exclusiveModalTimerInterval) clearInterval(this.exclusiveModalTimerInterval);
+            this.exclusiveModalTimerInterval = setInterval(() => {
+                this.exclusiveModalTimeLeft = Math.max(...this.exclusivePerkDurations);
+                if (this.exclusiveModalTimeLeft <= 0) {
+                    this.stopExclusiveModalTimer();
+                    countdown.innerText = 'EXPIRED';
+                    return;
+                }
+                countdown.innerText = this.formatExclusiveTime(this.exclusiveModalTimeLeft);
+                if (this.exclusiveModalTimeLeft <= 60) {
+                    modalBox.classList.add('border-red-500', 'shadow-[0_0_50px_rgba(211,47,47,0.5)]');
+                    countdown.classList.remove('text-amada-gold');
+                    countdown.classList.add('text-amada-red');
+                }
+            }, 1000);
+        }
+
+        stopExclusiveModalTimer() {
+            if (this.exclusiveModalTimerInterval) clearInterval(this.exclusiveModalTimerInterval);
+            this.exclusiveModalTimerInterval = null;
+        }
+
+        calcExclusiveTotal() {
+            const checkInEl = document.getElementById('guestExclusiveCheckInDate');
+            const checkOutEl = document.getElementById('guestExclusiveCheckOutDate');
+            const totalEl = document.getElementById('guestExclusiveModalTotal');
+            const nightsEl = document.getElementById('guestExclusiveNightCount');
+            const breakdownEl = document.getElementById('guestExclusiveChargeBreakdown');
+            if (!checkInEl || !checkOutEl || !totalEl || !nightsEl || !breakdownEl) return;
+
+            const todayIso = this.getTodayIsoDate();
+            if (checkInEl.value && checkInEl.value < todayIso) checkInEl.value = todayIso;
+
+            let checkInDate = new Date(checkInEl.value);
+            let checkOutDate = new Date(checkOutEl.value);
+            if (isNaN(checkInDate)) checkInDate = new Date(todayIso);
+            if (isNaN(checkOutDate) || checkOutDate <= checkInDate) {
+                checkOutDate = new Date(checkInDate);
+                checkOutDate.setDate(checkOutDate.getDate() + 1);
+                checkOutEl.value = checkOutDate.toISOString().split('T')[0];
+            }
+
+            const minOut = new Date(checkInDate);
+            minOut.setDate(minOut.getDate() + 1);
+            checkOutEl.min = minOut.toISOString().split('T')[0];
+
+            const nights = Math.max(1, Math.ceil((checkOutDate - checkInDate) / 86400000));
+            nightsEl.innerText = nights;
+
+            const property = this.inventory.find(item => item.id === this.exclusiveSelectedPropertyId);
+            const cautionFee = this.parseCurrencyValue(document.getElementById('guestExclusiveCautionFeePaid')?.value) || 0;
+            const stayTotal = (property ? property.price : 0) * nights;
+            const total = stayTotal + cautionFee;
+            totalEl.innerText = this.formatCurrency(total);
+            breakdownEl.innerText = cautionFee > 0
+                ? `Stay ${this.formatCurrency(stayTotal)} + caution ${this.formatCurrency(cautionFee)}`
+                : `Stay ${this.formatCurrency(stayTotal)}`;
+            this.setCurrencyInputValue('guestExclusiveActualPaid', total);
+        }
+
+        async handleExclusiveCheckout() {
+            const property = this.inventory.find(item => item.id === this.exclusiveSelectedPropertyId);
+            const phone = document.getElementById('guestExclusivePhone')?.value.trim();
+            const name = document.getElementById('guestExclusiveName')?.value.trim();
+            const email = document.getElementById('guestExclusiveEmail')?.value.trim();
+            const checkIn = document.getElementById('guestExclusiveCheckInDate')?.value;
+            const checkOut = document.getElementById('guestExclusiveCheckOutDate')?.value;
+            const paid = this.parseCurrencyValue(document.getElementById('guestExclusiveActualPaid')?.value);
+            const cautionFee = this.parseCurrencyValue(document.getElementById('guestExclusiveCautionFeePaid')?.value) || 0;
+            if (!property || !name || !phone || !/^\d{10,11}$/.test(phone)) {
+                this.showNotification('Complete your name and a valid phone number to secure the stay.', 'error');
+                return;
+            }
+            if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                this.showNotification('Enter a valid email address or leave it blank.', 'error');
+                return;
+            }
+            if (!checkIn || !checkOut) {
+                this.showNotification('Select valid check-in and check-out dates.', 'error');
+                return;
+            }
+            if (isNaN(paid)) {
+                this.showNotification('Enter the amount paid to proceed.', 'error');
+                return;
+            }
+
+            const checkInDate = new Date(checkIn);
+            const checkOutDate = new Date(checkOut);
+            const nights = Math.max(1, Math.ceil((checkOutDate - checkInDate) / 86400000));
+            const estimatedTotal = (Number(property.price) || 0) * nights + cautionFee;
+            const button = document.querySelector('#guestExclusiveCheckoutForm button[type="submit"]');
+            const originalText = button?.innerHTML;
+            if (button) {
+                button.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Processing Secure Payment...';
+                button.disabled = true;
+            }
+
+            const doorCode = await this.generateLockCode();
+            property.status = 'occupied';
+            property.guestName = name;
+            property.accessCode = doorCode;
+            const transaction = {
+                id: `tx_${Date.now()}`,
+                date: new Date().toISOString().split('T')[0],
+                propId: property.id,
+                amount: paid,
+                estimatedTotal,
+                cautionFee,
+                guest: name,
+                phone,
+                email,
+                accessCode: doorCode,
+                checkIn,
+                checkOut
+            };
+            this.transactions.push(transaction);
+            this.exclusivePendingTransactionId = transaction.id;
+            this.exclusiveBookingConfirmed = true;
+            this.saveLocalData();
+            const authUser = await this.getAuthenticatedUser().catch(() => null);
+            if (!authUser) {
+                await this.saveGuestBookingToCloud(transaction).catch(() => null);
+            }
+            this.prepareExclusiveSpinPrizes();
+            this.closeExclusiveBookingModal();
+            if (button) {
+                button.innerHTML = originalText || 'Proceed To Secure Payment';
+                button.disabled = false;
+            }
+            setTimeout(() => this.openExclusiveSpinModal(), 400);
+        }
+
+        openExclusiveSpinModal() {
+            document.getElementById('guestExclusiveSpinModal')?.classList.add('show');
+            this.renderExclusiveEligiblePerks();
+            this.resizeExclusiveCanvas();
+            const survivingCount = this.exclusivePerkLost.filter(lost => !lost).length;
+            const postText = document.getElementById('guestExclusivePostBookingText');
+            if (postText) {
+                let survivorText = '';
+                if (survivingCount === 7) survivorText = 'Incredible! You secured ALL 7 VIP Perks.';
+                else if (survivingCount > 0) survivorText = `You successfully locked in ${survivingCount} VIP perk${survivingCount > 1 ? 's' : ''}.`;
+                else survivorText = 'Even though your VIP perks expired, you still snagged a luxury stay!';
+                postText.innerHTML = `${survivorText} Now, take your <strong class="text-amada-red font-black">Free Spin</strong> to win a Cash Refund, Free Night, or Dinner.`;
+            }
+        }
+
+        closeExclusiveSpinModal(force = false) {
+            if (this.exclusiveIsSpinning && !force) return;
+            document.getElementById('guestExclusiveSpinModal')?.classList.remove('show');
+        }
+
+        ensureExclusiveSpinBindings() {
+            const button = document.getElementById('guestExclusiveSpinButton');
+            if (!button || button.dataset.bound === 'true') return;
+            button.addEventListener('click', () => this.spinExclusiveWheel());
+            button.dataset.bound = 'true';
+        }
+
+        resizeExclusiveCanvas() {
+            const container = document.querySelector('#guestExclusiveSpinModal .wheel-container');
+            const canvas = document.getElementById('guestExclusiveSpinWheelCanvas');
+            if (!container || !canvas) return;
+            const size = Math.min(container.offsetWidth || 320, container.offsetHeight || 320, 320);
+            canvas.width = size;
+            canvas.height = size;
+            this.drawExclusiveWheel();
+        }
+
+        drawExclusiveWheel() {
+            const canvas = document.getElementById('guestExclusiveSpinWheelCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+            const prizes = this.exclusiveSpinPrizePool.length ? this.exclusiveSpinPrizePool : this.exclusiveLosingSpinPrizes;
+            const numSegments = prizes.length;
+            const segmentAngle = (2 * Math.PI) / numSegments;
+            const radius = canvas.width / 2;
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.translate(radius, radius);
+            ctx.rotate(this.exclusiveSpinState.angle);
+
+            for (let i = 0; i < numSegments; i++) {
+                const prize = prizes[i];
+                const start = -segmentAngle / 2;
+                const end = segmentAngle / 2;
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, start, end, false);
+                ctx.closePath();
+                const gradient = ctx.createLinearGradient(0, -radius, 0, radius);
+                gradient.addColorStop(0, prize.colors.start);
+                gradient.addColorStop(1, prize.colors.end);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                ctx.strokeStyle = '#FFFFFF';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = prize.textColor || '#FFFFFF';
+                ctx.font = `800 ${Math.max(10, Math.min(13, radius / 12))}px Poppins`;
+                ctx.translate(radius * 0.82, 0);
+                ctx.fillText(prize.text, 0, 0);
+                ctx.restore();
+                ctx.rotate(segmentAngle);
+            }
+            ctx.restore();
+
+            ctx.beginPath();
+            ctx.arc(radius, radius, radius / 7, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fill();
+            ctx.strokeStyle = '#D4AF37';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.arc(radius, radius, radius / 15, 0, 2 * Math.PI);
+            ctx.fillStyle = '#111111';
+            ctx.fill();
+        }
+
+        normalizeExclusiveAngle(angle) {
+            return (angle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+        }
+
+        getExclusiveSegmentIndexAtPointer(wheelRotationAngle) {
+            const prizes = this.exclusiveSpinPrizePool.length ? this.exclusiveSpinPrizePool : this.exclusiveLosingSpinPrizes;
+            const numSegments = prizes.length;
+            const segmentAngle = (2 * Math.PI) / numSegments;
+            const pointerAngle = this.normalizeExclusiveAngle(3 * Math.PI / 2 - wheelRotationAngle);
+            const shifted = pointerAngle + segmentAngle / 2 + 1e-10;
+            return Math.floor(shifted / segmentAngle) % numSegments;
+        }
+
+        async spinExclusiveWheel() {
+            if (this.exclusiveIsSpinning) return;
+            this.exclusiveIsSpinning = true;
+            const button = document.getElementById('guestExclusiveSpinButton');
+            const pointer = document.getElementById('guestExclusivePointerEl');
+            if (button) {
+                button.disabled = true;
+                button.innerText = 'SPINNING...';
+            }
+            if (pointer) pointer.style.transform = 'translateX(-50%) rotate(0deg)';
+
+            if (typeof Tone !== 'undefined' && Tone.context.state !== 'running') {
+                try {
+                    await Tone.start();
+                    if (!tickSound) setupSounds();
+                } catch {}
+            } else if (typeof Tone !== 'undefined' && !tickSound) {
+                setupSounds();
+            }
+
+            const prizes = this.exclusiveSpinPrizePool.length ? this.exclusiveSpinPrizePool : this.exclusiveLosingSpinPrizes;
+            const numSegments = prizes.length;
+            const segmentAngle = (2 * Math.PI) / numSegments;
+            this.exclusiveSpinState.phase = 'initialSpin';
+            this.exclusiveSpinState.animationStartTime = null;
+            this.exclusiveSpinState.pointerSwinging = false;
+            this.exclusiveSpinState.initialStartAngle = this.exclusiveSpinState.angle;
+            const winningIndex = Math.floor(Math.random() * numSegments);
+            const fullRotations = Math.floor(Math.random() * 5) + 15;
+            let targetOrientation = this.normalizeExclusiveAngle((3 * Math.PI / 2) - (winningIndex * segmentAngle));
+            let currentNormalizedAngle = this.normalizeExclusiveAngle(this.exclusiveSpinState.initialStartAngle);
+            let diffAngle = targetOrientation - currentNormalizedAngle;
+            if (diffAngle < 0) diffAngle += (2 * Math.PI);
+            this.exclusiveSpinState.initialTargetAngle = this.exclusiveSpinState.initialStartAngle + (fullRotations * 2 * Math.PI) + diffAngle;
+            this.exclusiveSpinState.lastTickAngle = this.exclusiveSpinState.initialStartAngle;
+
+            const animate = (timestamp) => {
+                if (!this.exclusiveSpinState.animationStartTime) this.exclusiveSpinState.animationStartTime = timestamp;
+                const elapsed = timestamp - this.exclusiveSpinState.animationStartTime;
+                const fastSpinDuration = 3000;
+                const slowDownDuration = 8000;
+                const totalDuration = fastSpinDuration + slowDownDuration;
+                const bounceDuration = 700;
+                const pointerSwingDuration = 150;
+                const pointerSwingMagnitude = 15;
+
+                if (this.exclusiveSpinState.phase === 'initialSpin') {
+                    let progress = Math.min(elapsed / totalDuration, 1);
+                    let eased;
+                    if (elapsed < fastSpinDuration) {
+                        const fastProgress = elapsed / fastSpinDuration;
+                        eased = fastProgress * (fastSpinDuration / totalDuration);
+                    } else {
+                        const slowProgress = (elapsed - fastSpinDuration) / slowDownDuration;
+                        eased = (fastSpinDuration / totalDuration) + (slowDownDuration / totalDuration) * (1 - Math.pow(1 - slowProgress, 4));
+                    }
+                    this.exclusiveSpinState.angle = this.exclusiveSpinState.initialStartAngle + eased * (this.exclusiveSpinState.initialTargetAngle - this.exclusiveSpinState.initialStartAngle);
+                    if (tickSound && Tone.context.state === 'running' && Math.abs(this.exclusiveSpinState.angle - this.exclusiveSpinState.lastTickAngle) >= segmentAngle / 2) {
+                        try { tickSound.triggerAttackRelease('C3', '32n', Tone.now() + 0.02); } catch {}
+                        this.exclusiveSpinState.lastTickAngle = this.exclusiveSpinState.angle;
+                        this.exclusiveSpinState.pointerSwinging = true;
+                        this.exclusiveSpinState.pointerSwingStartTime = timestamp;
+                    }
+                    this.drawExclusiveWheel();
+                    if (progress >= 1) {
+                        this.exclusiveSpinState.angle = this.exclusiveSpinState.initialTargetAngle;
+                        this.drawExclusiveWheel();
+                        this.exclusiveCurrentPrizeData = prizes[this.getExclusiveSegmentIndexAtPointer(this.exclusiveSpinState.angle)];
+                        if (this.exclusiveCurrentPrizeData.isBounce) {
+                            this.exclusiveSpinState.phase = 'bouncing';
+                            this.exclusiveSpinState.animationStartTime = timestamp;
+                            this.exclusiveSpinState.bounceStartAngle = this.exclusiveSpinState.angle;
+                            this.exclusiveSpinState.bounceTargetAngle = this.exclusiveSpinState.angle + segmentAngle * (0.4 + Math.random() * 0.2);
+                            requestAnimationFrame(animate);
+                        } else {
+                            this.exclusiveSpinState.phase = 'finalizing';
+                            requestAnimationFrame(animate);
+                        }
+                        return;
+                    }
+                } else if (this.exclusiveSpinState.phase === 'bouncing') {
+                    const progress = Math.min(elapsed / bounceDuration, 1);
+                    const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+                    this.exclusiveSpinState.angle = this.exclusiveSpinState.bounceStartAngle + eased * (this.exclusiveSpinState.bounceTargetAngle - this.exclusiveSpinState.bounceStartAngle);
+                    this.drawExclusiveWheel();
+                    if (progress >= 1) {
+                        this.exclusiveSpinState.angle = this.exclusiveSpinState.bounceTargetAngle;
+                        this.exclusiveCurrentPrizeData = prizes[this.getExclusiveSegmentIndexAtPointer(this.exclusiveSpinState.angle)];
+                        this.exclusiveSpinState.phase = 'finalizing';
+                        requestAnimationFrame(animate);
+                        return;
+                    }
+                } else if (this.exclusiveSpinState.phase === 'finalizing') {
+                    this.showExclusiveResultModal(this.exclusiveCurrentPrizeData);
+                    this.exclusiveIsSpinning = false;
+                    this.exclusiveSpinState.phase = 'idle';
+                    if (pointer) pointer.style.transform = 'translateX(-50%) rotate(0deg)';
+                    return;
+                }
+
+                if (this.exclusiveSpinState.pointerSwinging && pointer) {
+                    const swingElapsed = timestamp - this.exclusiveSpinState.pointerSwingStartTime;
+                    const swingProgress = swingElapsed / pointerSwingDuration;
+                    if (swingProgress < 1) {
+                        pointer.style.transform = `translateX(-50%) rotate(${pointerSwingMagnitude * Math.sin(swingProgress * Math.PI)}deg)`;
+                    } else {
+                        this.exclusiveSpinState.pointerSwinging = false;
+                        pointer.style.transform = 'translateX(-50%) rotate(0deg)';
+                    }
+                }
+                requestAnimationFrame(animate);
+            };
+
+            requestAnimationFrame(animate);
+        }
+
+        showExclusiveResultModal(prize) {
+            this.closeExclusiveSpinModal(true);
+            const tx = this.transactions.find(item => item.id === this.exclusivePendingTransactionId);
+            if (tx) {
+                tx.reward = prize.type === 'tryAgain' || prize.type === 'soClose' ? null : prize;
+                this.saveLocalData();
+            }
+            const titleEl = document.getElementById('guestExclusivePrizeModalTitle');
+            const resultEl = document.getElementById('guestExclusivePrizeResult');
+            const detailEl = document.getElementById('guestExclusivePrizeDetail');
+            const qrEl = document.getElementById('guestExclusiveQrCodeEl');
+            const claimNoteEl = document.getElementById('guestExclusivePrizeClaimNote');
+            const downloadButton = document.getElementById('guestExclusiveRewardDownloadButton');
+            if (!titleEl || !resultEl || !detailEl || !qrEl || !claimNoteEl || !downloadButton) return;
+
+            if (prize.type === 'tryAgain' || prize.type === 'soClose') {
+                titleEl.innerText = 'Ah, So Close!';
+                resultEl.innerText = 'No Reward This Time';
+                detailEl.innerText = 'But you still secured a luxury stay. Check your email for confirmation.';
+                qrEl.style.display = 'none';
+                claimNoteEl.style.display = 'none';
+                downloadButton.classList.add('hidden');
+                this.exclusiveRewardReceiptTxId = null;
+            } else {
+                titleEl.innerText = 'JACKPOT!';
+                resultEl.innerText = prize.text;
+                detailEl.innerText = prize.detail;
+                qrEl.style.display = 'inline-block';
+                claimNoteEl.style.display = '';
+                downloadButton.classList.remove('hidden');
+                this.exclusiveRewardReceiptTxId = tx?.id || null;
+                qrEl.innerHTML = '';
+                try {
+                    new QRCode(qrEl, {
+                        text: `Amada Reward: ${prize.text}\nCode: AMADA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                        width: 120,
+                        height: 120,
+                        colorDark: '#111111',
+                        colorLight: '#ffffff'
+                    });
+                } catch {}
+                if (typeof confetti === 'function') {
+                    confetti({ particleCount: 200, spread: 90, origin: { y: 0.5 }, colors: ['#D4AF37', '#D32F2F', '#111111'] });
+                }
+            }
+
+            document.getElementById('guestExclusivePrizeModal')?.classList.add('show');
+            const button = document.getElementById('guestExclusiveSpinButton');
+            if (button) {
+                button.disabled = false;
+                button.innerText = 'SPIN NOW';
+            }
+        }
+
+        showExclusiveStoredReward(prize, transactionId = null) {
+            if (!prize) {
+                this.showNotification('No reward is attached to this reservation yet.', 'error');
+                return;
+            }
+
+            const titleEl = document.getElementById('guestExclusivePrizeModalTitle');
+            const resultEl = document.getElementById('guestExclusivePrizeResult');
+            const detailEl = document.getElementById('guestExclusivePrizeDetail');
+            const qrEl = document.getElementById('guestExclusiveQrCodeEl');
+            const claimNoteEl = document.getElementById('guestExclusivePrizeClaimNote');
+            const downloadButton = document.getElementById('guestExclusiveRewardDownloadButton');
+            if (!titleEl || !resultEl || !detailEl || !qrEl || !claimNoteEl || !downloadButton) return;
+
+            titleEl.innerText = 'Reward Unlocked';
+            resultEl.innerText = prize.label || prize.text || 'Reward';
+            detailEl.innerText = prize.detail || 'Download your reward receipt and present it at check-in to claim it.';
+            qrEl.style.display = 'inline-block';
+            claimNoteEl.style.display = '';
+            downloadButton.classList.remove('hidden');
+            this.exclusiveRewardReceiptTxId = transactionId;
+            qrEl.innerHTML = '';
+
+            try {
+                new QRCode(qrEl, {
+                    text: `Amada Reward: ${prize.label || prize.text}\nCode: AMADA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                    width: 120,
+                    height: 120,
+                    colorDark: '#111111',
+                    colorLight: '#ffffff'
+                });
+            } catch {}
+
+            document.getElementById('guestExclusivePrizeModal')?.classList.add('show');
+        }
+
+        openExclusiveReceiptFromPendingBooking() {
+            const tx = this.transactions.find(item => item.id === this.exclusivePendingTransactionId);
+            if (!tx) return;
+
+            const receiptData = this.getTransactionReceiptData(tx);
+            this.populateReceiptModal(receiptData);
+            document.getElementById('receiptModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('receiptModal').classList.add('show'), 10);
+            this.exclusivePendingTransactionId = null;
+        }
+
+        claimExclusiveReservationReward(transactionId) {
+            const tx = this.transactions.find(item => (item.id || this.getTransactionId(item)) === transactionId);
+            if (!tx?.reward) {
+                this.showNotification('No reward is attached to this reservation yet.', 'error');
+                return;
+            }
+            this.showExclusiveStoredReward(tx.reward, tx.id || this.getTransactionId(tx));
+        }
+
+        downloadExclusiveRewardReceipt() {
+            if (!this.exclusiveRewardReceiptTxId) {
+                this.showNotification('No reward receipt is available to download.', 'error');
+                return;
+            }
+            const tx = this.transactions.find(item => (item.id || this.getTransactionId(item)) === this.exclusiveRewardReceiptTxId);
+            if (!tx?.reward) {
+                this.showNotification('No reward receipt is available to download.', 'error');
+                return;
+            }
+            this.downloadReceiptImage(this.getTransactionReceiptData(tx));
+        }
+
+        closeExclusivePrizeModal() {
+            document.getElementById('guestExclusivePrizeModal')?.classList.remove('show');
+            this.openExclusiveReceiptFromPendingBooking();
+        }
+
+        drawRewardWheel() {
+            const canvas = document.getElementById('rewardWheelCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return;
+
+            const size = canvas.width;
+            const radius = size / 2;
+            const innerRadius = 28;
+            const slice = (Math.PI * 2) / this.rewardPrizes.length;
+
+            ctx.clearRect(0, 0, size, size);
+            ctx.save();
+            ctx.translate(radius, radius);
+            ctx.rotate(this.rewardWheelState.angle);
+
+            this.rewardPrizes.forEach((prize, index) => {
+                const start = -Math.PI / 2 - slice / 2 + index * slice;
+                const end = start + slice;
+                const grad = ctx.createLinearGradient(-radius, -radius, radius, radius);
+                grad.addColorStop(0, prize.color);
+                grad.addColorStop(1, '#fff4d6');
+
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius - 12, start, end);
+                ctx.closePath();
+                ctx.fillStyle = grad;
+                ctx.fill();
+
+                ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.rotate(start + slice / 2);
+                ctx.translate(0, -(radius - 66));
+                ctx.rotate(Math.PI / 2);
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#1a1a1a';
+                ctx.font = '700 15px Poppins';
+
+                const words = prize.label.split(' ');
+                const firstLine = words.slice(0, Math.ceil(words.length / 2)).join(' ');
+                const secondLine = words.slice(Math.ceil(words.length / 2)).join(' ');
+                ctx.fillText(firstLine, 0, -8);
+                if (secondLine) ctx.fillText(secondLine, 0, 12);
+                ctx.restore();
+            });
+
+            ctx.beginPath();
+            ctx.arc(0, 0, innerRadius, 0, Math.PI * 2);
+            ctx.fillStyle = '#ffffff';
+            ctx.fill();
+            ctx.lineWidth = 8;
+            ctx.strokeStyle = '#ffcf6a';
+            ctx.stroke();
+            ctx.fillStyle = '#1a1a1a';
+            ctx.font = '700 13px Poppins';
+            ctx.textAlign = 'center';
+            ctx.fillText('BONUS', 0, 4);
+
+            ctx.restore();
+        }
+
+        getRewardWinningIndex() {
+            const weightedPool = [0, 0, 1, 1, 2, 2, 3, 4, 5, 6, 7];
+            return weightedPool[Math.floor(Math.random() * weightedPool.length)];
+        }
+
+        openRewardModal(transaction, receiptData) {
+            this.currentRewardTransactionId = transaction.id;
+            this.currentRewardData = transaction.reward || null;
+            this.pendingReceiptData = receiptData;
+            this.rewardWheelState = {
+                angle: 0,
+                spinning: false,
+                selectedIndex: null
+            };
+
+            this.renderRewardLegend();
+            this.drawRewardWheel();
+
+            const result = document.getElementById('rewardResultText');
+            const spinBtn = document.getElementById('rewardSpinButton');
+            const continueBtn = document.getElementById('rewardContinueButton');
+            if (result) result.innerText = 'Press spin to reveal your booking reward.';
+            if (spinBtn) {
+                spinBtn.disabled = false;
+                spinBtn.innerHTML = '<i class="fa-solid fa-dice"></i> Spin My Reward';
+            }
+            if (continueBtn) continueBtn.disabled = true;
+
+            document.getElementById('rewardModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('rewardModal').classList.add('show'), 10);
+        }
+
+        spinRewardWheel() {
+            if (this.rewardWheelState.spinning) return;
+
+            const spinBtn = document.getElementById('rewardSpinButton');
+            const continueBtn = document.getElementById('rewardContinueButton');
+            const result = document.getElementById('rewardResultText');
+            const winIndex = this.getRewardWinningIndex();
+            const fullTurns = 6 + Math.floor(Math.random() * 3);
+            const startAngle = this.rewardWheelState.angle;
+            const slice = (Math.PI * 2) / this.rewardPrizes.length;
+            const targetAngle = startAngle + (fullTurns * Math.PI * 2) - (winIndex * slice);
+            const duration = 4600;
+
+            this.rewardWheelState.spinning = true;
+            if (spinBtn) {
+                spinBtn.disabled = true;
+                spinBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Revealing...';
+            }
+            if (result) result.innerText = 'Spinning... your reward is being unlocked.';
+
+            const startTime = performance.now();
+            const animate = (now) => {
+                const progress = Math.min((now - startTime) / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 4);
+                this.rewardWheelState.angle = startAngle + (targetAngle - startAngle) * eased;
+                this.drawRewardWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                    return;
+                }
+
+                const prize = this.rewardPrizes[winIndex];
+                this.rewardWheelState.angle = targetAngle;
+                this.rewardWheelState.spinning = false;
+                this.rewardWheelState.selectedIndex = winIndex;
+                this.currentRewardData = prize;
+
+                const tx = this.transactions.find(item => item.id === this.currentRewardTransactionId);
+                if (tx) {
+                    tx.reward = prize;
+                    tx.rewardIssuedAt = new Date().toISOString();
+                }
+
+                if (this.pendingReceiptData) {
+                    this.pendingReceiptData.reward = prize;
+                }
+                this.saveLocalData();
+
+                if (result) {
+                    result.innerHTML = `<strong>${prize.label}</strong>${prize.detail}`;
+                }
+                if (continueBtn) continueBtn.disabled = false;
+                if (spinBtn) {
+                    spinBtn.innerHTML = '<i class="fa-solid fa-circle-check"></i> Reward Unlocked';
+                }
+            };
+
+            requestAnimationFrame(animate);
+        }
+
+        completeRewardFlow() {
+            const modal = document.getElementById('rewardModal');
+            if (modal) {
+                modal.classList.remove('show');
+                setTimeout(() => {
+                    modal.style.display = 'none';
+                }, 300);
+            }
+
+            if (!this.pendingReceiptData) return;
+            this.populateReceiptModal(this.pendingReceiptData);
+            this.pendingReceiptData = null;
+            document.getElementById('receiptModal').style.display = 'flex';
+            setTimeout(() => document.getElementById('receiptModal').classList.add('show'), 10);
         }
 
         lookupGuestReservations() {
@@ -3308,6 +5117,58 @@
                             <button class="btn-outline" onclick="app.downloadGuestReceipt('${tx.id || this.getTransactionId(tx)}')">
                                 <i class="fa-solid fa-download"></i> Download Receipt
                             </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        lookupExclusiveReservations() {
+            const phone = document.getElementById('guestExclusiveLookupPhone')?.value.trim();
+            const pin = document.getElementById('guestExclusiveLookupPin')?.value.trim();
+            const target = document.getElementById('guestExclusiveReservationsArea');
+            if (!target) return;
+
+            if (!phone || !pin) {
+                target.innerHTML = `<div class="text-gray-500 font-medium">Enter your phone number and booking PIN to continue.</div>`;
+                return;
+            }
+
+            const matches = this.transactions.filter(tx => tx.phone === phone && tx.accessCode === pin);
+            if (!matches.length) {
+                target.innerHTML = `<div class="text-gray-500 font-medium">No reservations matched that phone number and PIN.</div>`;
+                return;
+            }
+
+            target.innerHTML = matches.slice().reverse().map(tx => {
+                const receipt = this.getTransactionReceiptData(tx);
+                const txId = tx.id || this.getTransactionId(tx);
+                const rewardButton = tx.reward
+                    ? `<button class="inline-flex items-center gap-2 border-2 border-amber-400 text-amber-700 px-5 py-2.5 rounded-full font-bold hover:bg-amber-50 transition" onclick="app.claimExclusiveReservationReward('${txId}')">
+                                <i class="fa-solid fa-gift"></i> Claim Reward
+                            </button>`
+                    : `<span class="text-sm text-gray-400 font-medium">No reward attached yet</span>`;
+                return `
+                    <div class="bg-white border border-gray-200 rounded-[1.5rem] p-6 shadow-sm mb-4">
+                        <div class="flex justify-between gap-4 flex-wrap">
+                            <div>
+                                <div class="font-black text-2xl text-gray-900">${receipt.property}</div>
+                                <div class="text-gray-500 font-medium mt-1">${receipt.location}</div>
+                                <div class="text-sm text-gray-500 mt-3">${receipt.checkIn} to ${receipt.checkOut}</div>
+                            </div>
+                            <div class="text-left md:text-right">
+                                <div class="font-black text-2xl text-amada-red">${this.formatCurrency(receipt.total)}</div>
+                                <div class="text-sm text-gray-500 mt-2">PIN: ${receipt.code}</div>
+                            </div>
+                        </div>
+                        <div class="flex justify-between items-center gap-4 mt-6 flex-wrap">
+                            <div class="text-sm text-gray-500">Guest: ${receipt.guest} • Receipt: ${receipt.receiptNumber}</div>
+                            <div class="flex items-center gap-3 flex-wrap">
+                                ${rewardButton}
+                                <button class="inline-flex items-center gap-2 border-2 border-gray-900 text-gray-900 px-5 py-2.5 rounded-full font-bold hover:bg-gray-900 hover:text-white transition" onclick="app.downloadGuestReceipt('${txId}')">
+                                    <i class="fa-solid fa-download"></i> Download Receipt
+                                </button>
+                            </div>
                         </div>
                     </div>
                 `;
@@ -3389,7 +5250,7 @@
             return `
                 <div class="panel">
                     <h3 style="margin-top:0; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-money-bill-wave" style="color:var(--primary)"></i> Submit Expenditure Request</h3>
-                    <p style="color:var(--gray); margin:6px 0 22px 0;">A second staff member must approve each request before it reaches the chairman table.</p>
+                    <p style="color:var(--gray); margin:6px 0 22px 0;">A second staff member must approve each request before it reaches the executive table.</p>
                     <form id="staffExpenseForm" onsubmit="event.preventDefault(); app.submitStaffExpenditure();">
                         <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
                             <div class="input-floating"><input type="text" id="staffExpenseTitle" required><label>Expense Title</label></div>
@@ -3446,7 +5307,7 @@
                                 </label>
                                 <div>
                                 <strong>${this.formatCurrency(exp.amount)}</strong>
-                                <div style="font-size:0.8rem; color:${exp.status === 'Approved for chairman' ? 'var(--success)' : 'var(--warning)'}; margin-top:6px;">${exp.status || 'Pending approval'}</div>
+                                <div style="font-size:0.8rem; color:${this.isExecutiveApprovedStatus(exp.status) ? 'var(--success)' : 'var(--warning)'}; margin-top:6px;">${this.getDisplayExpenseStatus(exp.status)}</div>
                                 </div>
                             </div>
                         </div>
@@ -3687,7 +5548,7 @@
                 .filter(entry => location === 'all' || entry.location === location)
                 .reduce((sum, entry) => sum + this.getReportingRentAmount(entry, from, to), 0);
             const sundry = this.expenditures
-                .filter(entry => entry.status === 'Approved for chairman')
+                .filter(entry => this.isExecutiveApprovedStatus(entry.status))
                 .filter(entry => this.isDateInRange(entry.approvedAt || entry.date, from, to))
                 .filter(entry => !this.isHostDelegatedView() || scopedLocations.has(entry.scope) || entry.staffId === this.currentHostEmail || entry.approverStaffId === this.currentHostEmail)
                 .filter(entry => location === 'all' || entry.scope === location)
@@ -3731,7 +5592,7 @@
             const vat = netRevenue > 0 ? netRevenue * 0.125 : 0;
             const maintenance = netRevenue > 0 ? netRevenue * 0.05 : 0;
             const approvedExpenses = exps
-                .filter(exp => exp.status === 'Approved for chairman')
+                .filter(exp => this.isExecutiveApprovedStatus(exp.status))
                 .reduce((sum, exp) => sum + (exp.amount || 0), 0);
             const operatingProfit = netRevenue - vat - maintenance - baselines.rent - baselines.salary - approvedExpenses;
             const avgDailyRate = txs.length ? bookingRevenue / txs.length : 0;
@@ -3837,11 +5698,11 @@
             expense.approver = approverName;
             expense.approverStaffId = approverStaffId;
             expense.approverPin = approverPin;
-            expense.status = 'Approved for chairman';
+            expense.status = 'Approved for executive';
             expense.approvedAt = new Date().toISOString().split('T')[0];
 
             this.saveLocalData();
-            this.showNotification("Expenditure approved and forwarded to chairman.", "success");
+            this.showNotification("Expenditure approved and forwarded to executive.", "success");
             this.render();
         }
 
@@ -3887,6 +5748,8 @@
             const amount = this.parseCurrencyValue(document.getElementById('salaryAmount').value);
             const phone = document.getElementById('salaryPhone').value.trim();
             const email = document.getElementById('salaryEmail').value.trim();
+            const assignedPropertyId = document.getElementById('salaryAssignedProperty').value;
+            const assignedPropertyName = this.inventory.find(item => item.id === assignedPropertyId)?.name || '';
 
             if (!staffName || !role || !location || isNaN(amount) || amount <= 0) {
                 this.showNotification("Complete the salary form before saving.", "error");
@@ -3902,6 +5765,8 @@
                 existing.amount = amount;
                 existing.phone = phone;
                 existing.email = email;
+                existing.assignedPropertyId = assignedPropertyId;
+                existing.assignedPropertyName = assignedPropertyName;
             } else {
                 this.salaryRegistry.push({
                     id: `sal_${Date.now()}`,
@@ -3910,7 +5775,9 @@
                     location,
                     amount,
                     phone,
-                    email
+                    email,
+                    assignedPropertyId,
+                    assignedPropertyName
                 });
             }
 
@@ -4014,7 +5881,7 @@
                     dateTo: this.chairmanDateTo,
                     location: this.chairmanLocation,
                     reportType: this.chairmanReportType,
-                    title: "Chairman's Report"
+                    title: "Executive Report"
                 };
             }
 
@@ -4059,7 +5926,7 @@
             }
 
             return this.getFilteredExpenditures(context.dateFrom, context.dateTo, context.location)
-                .filter(exp => scope !== 'chairman' || exp.status === 'Approved for chairman')
+                .filter(exp => scope !== 'chairman' || this.isExecutiveApprovedStatus(exp.status))
                 .map(exp => ({
                 Date: exp.date || '',
                 Type: exp.status || 'Expense',
@@ -4277,12 +6144,12 @@
             const metrics = this.getExecutiveMetrics(this.managementDateFrom, this.managementDateTo, this.managementLocation);
             const locations = this.getAvailableLocations();
             const recentExpenses = metrics.exps
-                .filter(exp => exp.status === 'Approved for chairman')
+                .filter(exp => this.isExecutiveApprovedStatus(exp.status))
                 .slice()
                 .sort((a, b) => ((b.approvedAt || b.date || '')).localeCompare(a.approvedAt || a.date || ''))
                 .slice(0, 5);
             const pendingExpenses = this.getFilteredExpenditures(this.managementDateFrom, this.managementDateTo, this.managementLocation)
-                .filter(exp => exp.status !== 'Approved for chairman')
+                .filter(exp => !this.isExecutiveApprovedStatus(exp.status))
                 .sort((a, b) => (b.createdAt || b.date || '').localeCompare(a.createdAt || a.date || ''));
             const unpaidTransactions = metrics.txs
                 .map(tx => {
@@ -4411,7 +6278,7 @@
                     ` : this.activeMgmtTab === 'ops' ? `
                         <div class="panel">
                             <h3 style="margin-top:0; display:flex; align-items:center; gap:10px;"><i class="fa-solid fa-money-check-dollar" style="color:var(--primary)"></i> Expenditure Approval Queue</h3>
-                            <p style="color:var(--gray); margin:6px 0 18px 0;">Management users need a different approver, while the host owner can approve directly before it reaches the chairman table.</p>
+                            <p style="color:var(--gray); margin:6px 0 18px 0;">Management users need a different approver, while the host owner can approve directly before it reaches the executive table.</p>
                             ${pendingExpenses.length === 0 ? `<div style="padding:24px 0; color:var(--gray);">No pending expenditure requests right now.</div>` : pendingExpenses.map(exp => `
                                 <div style="border:1px solid #eee; border-radius:16px; padding:18px; margin-bottom:16px; background:#fcfcfc;">
                                     <div style="display:flex; justify-content:space-between; gap:18px; flex-wrap:wrap; margin-bottom:14px;">
@@ -4449,7 +6316,7 @@
                             <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap;">
                                 <div>
                                     <h3 style="margin:0 0 6px 0;">Approved Expenditure Ledger</h3>
-                                    <p style="margin:0; color:var(--gray);">Only approved expenditure entries flow onward to the chairman table and exports.</p>
+                                    <p style="margin:0; color:var(--gray);">Only approved expenditure entries flow onward to the executive table and exports.</p>
                                 </div>
                                 <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
                                     <div class="input-floating" style="margin:0; min-width:180px;">
@@ -4478,7 +6345,7 @@
                                         </label>
                                         <div>
                                         <strong>${this.formatCurrency(exp.amount)}</strong>
-                                        <div style="font-size:0.8rem; color:${exp.status === 'Approved for chairman' ? 'var(--success)' : 'var(--warning)'}; margin-top:6px;">${exp.status || 'Pending approval'}</div>
+                                        <div style="font-size:0.8rem; color:${this.isExecutiveApprovedStatus(exp.status) ? 'var(--success)' : 'var(--warning)'}; margin-top:6px;">${this.getDisplayExpenseStatus(exp.status)}</div>
                                         </div>
                                     </div>
                                 </div>
@@ -4490,6 +6357,7 @@
                             const editingRent = this.rentRegistry.find(entry => entry.location === this.currentRentEditLocation);
                             const presetRole = editingSalary && ['Housekeeper', 'Manager', 'Supervisor', 'Chef', 'Driver', 'Laundry', 'Security', 'Other'].includes(editingSalary.role) ? editingSalary.role : editingSalary ? 'Other' : 'Housekeeper';
                             const presetOtherRole = editingSalary && !['Housekeeper', 'Manager', 'Supervisor', 'Chef', 'Driver', 'Laundry', 'Security'].includes(editingSalary.role) ? editingSalary.role : '';
+                            const salaryPropertyOptions = this.getScopedInventoryRecords();
                             return `
                         <div style="display:grid; grid-template-columns:minmax(320px, 1fr) minmax(320px, 1fr); gap:24px;">
                             <div class="panel">
@@ -4521,6 +6389,13 @@
                                         <div class="input-floating"><input type="text" id="salaryAmount" value="${this.formatCurrencyInputValue(editingSalary?.amount || '')}" data-currency inputmode="numeric" autocomplete="off" required><label>Monthly Salary (₦)</label></div>
                                         <div class="input-floating"><input type="tel" id="salaryPhone" value="${editingSalary?.phone || ''}" oninput="this.value = this.value.replace(/[^0-9]/g, '')"><label>Phone Number</label></div>
                                         <div class="input-floating"><input type="email" id="salaryEmail" value="${editingSalary?.email || ''}"><label>Email Address</label></div>
+                                        <div class="input-floating">
+                                            <select id="salaryAssignedProperty">
+                                                <option value="">No specific property</option>
+                                                ${salaryPropertyOptions.map(prop => `<option value="${prop.id}" ${editingSalary?.assignedPropertyId === prop.id ? 'selected' : ''}>${prop.name} (${prop.loc})</option>`).join('')}
+                                            </select>
+                                            <label style="top:5px; font-size:0.7rem;">Assigned Property</label>
+                                        </div>
                                     </div>
                                     <div style="display:flex; gap:12px; margin-top:10px; flex-wrap:wrap;">
                                         <button class="btn-primary" style="justify-content:center;">
@@ -4564,6 +6439,7 @@
                                     <div>
                                         <div style="font-weight:600;">${entry.staffName}</div>
                                         <div style="font-size:0.84rem; color:var(--gray);">${entry.role} • ${entry.location}</div>
+                                        <div style="font-size:0.8rem; color:var(--gray);">${entry.assignedPropertyName || 'No assigned property'}</div>
                                         <div style="font-size:0.8rem; color:var(--gray);">${entry.phone || 'No phone'} • ${entry.email || 'No email'}</div>
                                     </div>
                                     <div style="display:flex; gap:12px; align-items:center;">
@@ -4630,14 +6506,14 @@
             const metrics = this.getExecutiveMetrics(this.chairmanDateFrom, this.chairmanDateTo, this.chairmanLocation);
             const locations = this.getAvailableLocations();
             const chairmanExpenses = this.getFilteredExpenditures(this.chairmanDateFrom, this.chairmanDateTo, this.chairmanLocation)
-                .filter(exp => exp.status === 'Approved for chairman')
+                .filter(exp => this.isExecutiveApprovedStatus(exp.status))
                 .sort((a, b) => (b.approvedAt || b.date || '').localeCompare(a.approvedAt || a.date || ''))
                 .slice(0, 8);
 
             container.innerHTML = `
                 <div style="animation: fadeIn 0.5s ease;">
                     <div style="margin-bottom:24px;">
-                        <h2 style="font-family:var(--font-body); font-size:2.3rem; margin:0 0 4px 0;">Chairman's Dashboard</h2>
+                        <h2 style="font-family:var(--font-body); font-size:2.3rem; margin:0 0 4px 0;">Executive Dashboard</h2>
                         <p style="color:var(--gray); margin:0;">Executive Overview</p>
                     </div>
 
@@ -4730,7 +6606,7 @@
                     </div>
 
                     <div class="panel">
-                        <h3 style="margin-top:0;">Chairman Expenditure Table</h3>
+                        <h3 style="margin-top:0;">Executive Expenditure Table</h3>
                         <p style="color:var(--gray); margin:6px 0 18px 0;">Only requests approved by another staff member are shown here.</p>
                         ${chairmanExpenses.length === 0 ? `<div style="padding:18px 0; color:var(--gray);">No approved expenditure requests available for this filter.</div>` : `
                             <div style="overflow:auto;">
@@ -4768,7 +6644,7 @@
                         <div style="display:flex; justify-content:space-between; align-items:flex-end; gap:20px; flex-wrap:wrap;">
                             <div>
                                 <h3 style="margin:0 0 6px 0;">Download Executive Report</h3>
-                                <p style="margin:0; color:var(--gray);">Export the current chairman view as income or expenditure.</p>
+                                <p style="margin:0; color:var(--gray);">Export the current executive view as income or expenditure.</p>
                             </div>
                             <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:center;">
                                 <div class="input-floating" style="margin:0; min-width:180px;">
@@ -4947,7 +6823,7 @@
 
             if (signedInRole === 'chairman') {
                 if (r === 'host') {
-                    this.showNotification("Chairman accounts do not have host access.", "error");
+                    this.showNotification("Executive accounts do not have host access.", "error");
                     return;
                 }
                 this.setRole(r);
@@ -5135,22 +7011,14 @@
             
             // Populate and Show the Beautiful Receipt Modal
             const receiptData = this.getTransactionReceiptData(transaction);
-            this.currentReceiptData = receiptData;
-            document.getElementById('recGuest').innerText = receiptData.guest;
-            document.getElementById('recProp').innerText = receiptData.property;
-            document.getElementById('recIn').innerText = receiptData.checkIn;
-            document.getElementById('recOut').innerText = receiptData.checkOut;
-            document.getElementById('recTotal').innerText = this.formatCurrency(receiptData.total);
-            document.getElementById('recPaid').innerText = this.formatCurrency(receiptData.totalPaid);
-            document.getElementById('recBalance').innerText = this.formatCurrency(receiptData.balance);
-            document.getElementById('recCode').innerText = receiptData.code;
-
-            document.getElementById('receiptModal').style.display = 'flex';
-            setTimeout(() => document.getElementById('receiptModal').classList.add('show'), 10);
+            this.populateReceiptModal(receiptData);
             
             if(this.activeModalMode === 'guest') {
-                this.showNotification("Booking confirmed & Payment processed!", "success");
+                this.openRewardModal(transaction, receiptData);
+                this.showNotification("Booking confirmed. Your bonus spin is ready.", "success");
             } else {
+                document.getElementById('receiptModal').style.display = 'flex';
+                setTimeout(() => document.getElementById('receiptModal').classList.add('show'), 10);
                 this.showNotification("Booking confirmed & Locks synced!", "success");
             }
             

@@ -179,6 +179,638 @@
             font-family: var(--font-heading); margin: 10px 0;
         }
 
+        /* Exclusive guest page */
+        #guestExclusivePage {
+            background-color: #FAFAFA;
+            color: #111111;
+            overflow-x: hidden;
+            scroll-behavior: smooth;
+        }
+        .glass-light {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 1);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05);
+        }
+        .slide {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            transition: opacity 1s ease-in-out;
+            z-index: 0;
+            background-size: cover;
+            background-position: center;
+        }
+        .slide.active {
+            opacity: 1;
+            z-index: 1;
+        }
+        .slide-overlay {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(to right, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.65) 50%, rgba(255,255,255,0.2) 100%);
+        }
+        .urgency-banner-red {
+            background: linear-gradient(90deg, #D32F2F 0%, #B71C1C 100%);
+            box-shadow: 0 4px 15px rgba(211, 47, 47, 0.3);
+        }
+        .urgency-banner-gold {
+            background: linear-gradient(90deg, #D4AF37 0%, #B8860B 100%);
+            box-shadow: 0 4px 15px rgba(212, 175, 55, 0.3);
+        }
+        #guestExclusivePage ::-webkit-scrollbar {
+            width: 8px;
+        }
+        #guestExclusivePage ::-webkit-scrollbar-track {
+            background: #F3F4F6;
+        }
+        #guestExclusivePage ::-webkit-scrollbar-thumb {
+            background: #D4AF37;
+            border-radius: 4px;
+        }
+        .slim-scrollbar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .slim-scrollbar::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.02);
+        }
+        .slim-scrollbar::-webkit-scrollbar-thumb {
+            background: #D4AF37;
+            border-radius: 2px;
+        }
+        .listing-card {
+            background: #FFFFFF;
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        .listing-card.list-mode {
+            display: grid;
+            grid-template-columns: minmax(280px, 360px) minmax(0, 1fr);
+        }
+        .listing-card.list-mode .guest-exclusive-media {
+            height: 100%;
+            min-height: 280px;
+        }
+        .listing-card.list-mode .guest-exclusive-card-body {
+            justify-content: flex-start;
+            gap: 12px;
+            min-height: 0;
+        }
+        .listing-card.list-mode .guest-exclusive-card-header {
+            margin-bottom: 0;
+        }
+        .listing-card.list-mode .guest-exclusive-card-location {
+            margin-bottom: 0;
+        }
+        .listing-card.list-mode .guest-exclusive-card-perks {
+            margin-bottom: 0;
+        }
+        .listing-card.list-mode .guest-exclusive-card-meta {
+            margin-top: 0;
+            margin-bottom: 0;
+        }
+        .listing-card.list-mode .guest-exclusive-card-footer {
+            margin-top: 0;
+            padding-top: 16px;
+        }
+        .listing-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border-color: rgba(212, 175, 55, 0.4);
+        }
+        .guest-exclusive-filter-field,
+        .guest-exclusive-reservation-field {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            background: #fff;
+            border: 1px solid #d1d5db;
+            border-radius: 1rem;
+            padding: 10px 14px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.8);
+        }
+        .guest-exclusive-filter-field span,
+        .guest-exclusive-reservation-field span {
+            font-size: 0.76rem;
+            font-weight: 800;
+            color: #fb5d6d;
+        }
+        .guest-exclusive-filter-field select,
+        .guest-exclusive-reservation-field input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            color: #111111;
+            font-size: 0.92rem;
+            font-weight: 600;
+            min-height: 22px;
+        }
+        .guest-exclusive-filter-field select:focus,
+        .guest-exclusive-reservation-field input:focus {
+            outline: none;
+        }
+        .shimmer-bg {
+            background: linear-gradient(90deg, rgba(211,47,47,1) 25%, rgba(255,100,100,1) 50%, rgba(211,47,47,1) 75%);
+            background-size: 200% 100%;
+        }
+        .wheel-container {
+            position: relative;
+            width: 320px;
+            height: 320px;
+            margin: 0 auto;
+        }
+        #guestExclusiveSpinWheelCanvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%) rotate(0deg);
+            width: 0;
+            height: 0;
+            border-left: 20px solid transparent;
+            border-right: 20px solid transparent;
+            border-top: 35px solid #111111;
+            filter: drop-shadow(0px 4px 4px rgba(0,0,0,0.3));
+            z-index: 10;
+            transition: transform 0.1s ease-out;
+        }
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: flex-start;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            padding: 40px 20px 24px;
+            overflow-y: auto;
+        }
+        .modal-overlay.show {
+            opacity: 1;
+            visibility: visible;
+        }
+        .modal-overlay .modal-content {
+            transform: scale(0.95) translateY(20px);
+            transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            max-height: calc(100vh - 64px);
+            overflow-y: auto;
+            margin: 0 auto;
+        }
+        .modal-overlay.show .modal-content {
+            transform: scale(1) translateY(0);
+        }
+        #guestExclusiveBookingPerksDock {
+            transition: opacity 0.2s ease, transform 0.2s ease;
+        }
+        @media (max-width: 1024px) {
+            #guestExclusiveBookingPerksDock {
+                top: auto;
+                right: 12px;
+                left: 12px;
+                bottom: 12px;
+                transform: none;
+                width: auto;
+                max-height: 36vh;
+                overflow-y: auto;
+                border-radius: 24px;
+            }
+        }
+        #guestExclusiveToastContainer {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            z-index: 50;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        @media (max-width: 1024px) {
+            .listing-card.list-mode {
+                grid-template-columns: 1fr;
+            }
+            .listing-card.list-mode .guest-exclusive-media {
+                min-height: 240px;
+            }
+            .listing-card.list-mode .guest-exclusive-card-body {
+                gap: 16px;
+            }
+        }
+
+        /* Guest sales engine */
+        .guest-sales-hero {
+            display: grid;
+            grid-template-columns: 1.25fr 0.95fr;
+            gap: 28px;
+            margin-bottom: 28px;
+        }
+        .guest-sales-copy,
+        .guest-sales-card,
+        .guest-benefit-card,
+        .guest-assurance-item {
+            background: #fff;
+            border-radius: 28px;
+            border: 1px solid rgba(0,0,0,0.05);
+            box-shadow: var(--shadow-md);
+        }
+        .guest-sales-copy {
+            padding: 40px;
+            background:
+                radial-gradient(circle at top left, rgba(255, 56, 92, 0.18), transparent 34%),
+                radial-gradient(circle at bottom right, rgba(255, 180, 0, 0.18), transparent 28%),
+                linear-gradient(135deg, #111827 0%, #191b30 52%, #2f143d 100%);
+            color: #fff;
+        }
+        .guest-kicker,
+        .reward-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.14);
+            font-size: 0.76rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 18px;
+        }
+        .guest-sales-copy h1 {
+            font-family: var(--font-heading);
+            font-size: 3.35rem;
+            line-height: 1.03;
+            margin-bottom: 16px;
+        }
+        .guest-sales-copy p {
+            color: rgba(255,255,255,0.88);
+            font-size: 1.05rem;
+            line-height: 1.7;
+            max-width: 700px;
+        }
+        .guest-chip-row,
+        .guest-cta-row,
+        .guest-proof-strip,
+        .guest-score-row,
+        .guest-benefits-grid,
+        .reward-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .guest-offer-stack {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            margin-top: 24px;
+        }
+        .flash-offer-card {
+            padding: 20px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.12);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.08);
+        }
+        .flash-offer-card-primary {
+            background: linear-gradient(135deg, rgba(255, 72, 72, 0.24), rgba(255, 144, 31, 0.24));
+        }
+        .flash-offer-card-secondary {
+            background: linear-gradient(135deg, rgba(255,255,255,0.08), rgba(255,215,107,0.12));
+        }
+        .flash-offer-label {
+            font-size: 0.72rem;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #ffd76b;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        .flash-offer-card h3 {
+            font-size: 1.25rem;
+            line-height: 1.2;
+            margin-bottom: 8px;
+        }
+        .flash-offer-card p {
+            font-size: 0.92rem;
+            color: rgba(255,255,255,0.82);
+            margin: 0;
+        }
+        .flash-timer-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 14px;
+            margin-top: 16px;
+        }
+        .flash-timer-text {
+            font-size: 2rem;
+            line-height: 1;
+            font-weight: 700;
+            color: #fff;
+            font-variant-numeric: tabular-nums;
+        }
+        .flash-timer-caption {
+            font-size: 0.84rem;
+            color: rgba(255,255,255,0.74);
+            text-align: right;
+        }
+        .guest-chip-row,
+        .guest-cta-row {
+            margin-top: 24px;
+        }
+        .guest-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 16px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #fff;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+        .guest-proof-strip {
+            margin-top: 28px;
+        }
+        .guest-proof-strip div {
+            flex: 1 1 180px;
+            min-width: 180px;
+            padding: 16px 18px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .guest-proof-strip strong,
+        .guest-assurance-item strong {
+            display: block;
+            font-size: 0.95rem;
+            margin-bottom: 6px;
+        }
+        .guest-proof-strip span,
+        .guest-assurance-item span,
+        .guest-mini-note,
+        .guest-score-row span {
+            color: var(--gray);
+            font-size: 0.92rem;
+            line-height: 1.55;
+        }
+        .guest-proof-strip span {
+            color: rgba(255,255,255,0.72);
+        }
+        .guest-sales-card {
+            padding: 28px;
+            background:
+                radial-gradient(circle at top right, rgba(255, 214, 74, 0.28), transparent 24%),
+                linear-gradient(180deg, #fff 0%, #fff6ef 100%);
+        }
+        .guest-demand-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: #fff;
+            border: 1px solid rgba(0,0,0,0.06);
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .guest-demand-dot {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: var(--danger);
+            box-shadow: 0 0 0 8px rgba(252, 100, 45, 0.14);
+        }
+        .guest-score-row {
+            margin-bottom: 20px;
+        }
+        .guest-score-row div {
+            flex: 1 1 90px;
+            background: rgba(255,255,255,0.92);
+            padding: 16px;
+            border-radius: 18px;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        .guest-score-row strong {
+            display: block;
+            font-size: 1.15rem;
+            color: var(--dark);
+        }
+        .spin-teaser-card {
+            padding: 22px;
+            border-radius: 24px;
+            background: linear-gradient(135deg, #111827 0%, #401b56 100%);
+            color: #fff;
+        }
+        .spin-teaser-label {
+            color: #ffd76b;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            font-size: 0.76rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+        }
+        .spin-teaser-card h3 {
+            font-family: var(--font-heading);
+            font-size: 1.9rem;
+            line-height: 1.1;
+            margin-bottom: 14px;
+        }
+        .spin-teaser-card ul {
+            list-style: none;
+            display: grid;
+            gap: 10px;
+        }
+        .spin-teaser-card li {
+            position: relative;
+            padding-left: 22px;
+            color: rgba(255,255,255,0.88);
+        }
+        .spin-teaser-card li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            top: -1px;
+            color: #ffd76b;
+            font-size: 1.3rem;
+        }
+        .guest-mini-note {
+            margin-top: 18px;
+            color: #6d6257;
+        }
+        .guest-benefits-grid {
+            margin-bottom: 24px;
+        }
+        .guest-benefit-card {
+            flex: 1 1 260px;
+            padding: 28px;
+        }
+        .guest-benefit-icon {
+            width: 54px;
+            height: 54px;
+            border-radius: 18px;
+            background: linear-gradient(135deg, #ff385c 0%, #ff8a3d 100%);
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
+            margin-bottom: 18px;
+            box-shadow: 0 14px 26px rgba(255, 56, 92, 0.22);
+        }
+        .guest-benefit-card h3 {
+            font-size: 1.15rem;
+            margin-bottom: 10px;
+        }
+        .guest-benefit-card p {
+            color: var(--gray);
+            line-height: 1.65;
+            font-size: 0.95rem;
+        }
+        .guest-assurance-band {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 16px;
+            margin-bottom: 30px;
+        }
+        .guest-assurance-item {
+            padding: 22px 24px;
+        }
+
+        /* Reward wheel */
+        .reward-modal-content {
+            max-width: 980px;
+            padding: 34px;
+            background:
+                radial-gradient(circle at top right, rgba(255, 212, 95, 0.18), transparent 22%),
+                linear-gradient(180deg, #ffffff 0%, #fff9f0 100%);
+        }
+        .reward-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        .reward-header h2 {
+            font-family: var(--font-heading);
+            font-size: 2.35rem;
+            line-height: 1.08;
+            margin-bottom: 10px;
+        }
+        .reward-header p {
+            color: var(--gray);
+            max-width: 640px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        .reward-kicker {
+            background: rgba(255, 214, 107, 0.22);
+            border-color: rgba(242, 196, 109, 0.45);
+            color: #8a5a00;
+        }
+        .reward-wheel-layout {
+            display: grid;
+            grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
+            gap: 26px;
+            align-items: center;
+        }
+        .reward-wheel-shell {
+            position: relative;
+            width: min(100%, 360px);
+            aspect-ratio: 1;
+            margin: 0 auto;
+            display: grid;
+            place-items: center;
+            background: radial-gradient(circle at center, #fff 0%, #fff7e7 58%, #ffe2ad 100%);
+            border-radius: 50%;
+            box-shadow: 0 24px 45px rgba(78, 51, 12, 0.18);
+        }
+        #rewardWheelCanvas {
+            width: min(100%, 340px);
+            height: min(100%, 340px);
+            border-radius: 50%;
+        }
+        .reward-wheel-pointer {
+            position: absolute;
+            top: -8px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 0;
+            height: 0;
+            border-left: 18px solid transparent;
+            border-right: 18px solid transparent;
+            border-top: 30px solid #ff385c;
+            filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));
+            z-index: 2;
+        }
+        .reward-side-panel {
+            display: grid;
+            gap: 16px;
+        }
+        .reward-side-box,
+        .reward-result-box {
+            background: rgba(255,255,255,0.9);
+            border: 1px solid rgba(0,0,0,0.06);
+            border-radius: 24px;
+            padding: 22px;
+            box-shadow: var(--shadow-sm);
+        }
+        .reward-side-title {
+            font-size: 0.8rem;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #8a5a00;
+            margin-bottom: 12px;
+        }
+        .reward-legend {
+            display: grid;
+            gap: 10px;
+        }
+        .reward-legend-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: #4a4a4a;
+            font-size: 0.93rem;
+            line-height: 1.45;
+        }
+        .reward-legend-swatch {
+            width: 14px;
+            height: 14px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            margin-top: 4px;
+        }
+        .reward-result-text {
+            font-size: 1.02rem;
+            line-height: 1.65;
+            color: var(--dark);
+        }
+        .reward-result-text strong {
+            display: block;
+            font-size: 1.32rem;
+            margin-bottom: 6px;
+        }
+        .reward-actions {
+            justify-content: center;
+            margin-top: 24px;
+        }
+        .reward-actions .btn-outline[disabled] {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         /* --- DASHBOARD STYLES (Scoped to Portal View) --- */
         #portalView { padding-top: 80px; padding-bottom: 80px; display: none; background: var(--bg-gradient); min-height: 100vh;}
         
@@ -232,9 +864,9 @@
         .prop-price { font-size: 1.3rem; color: var(--primary); font-weight: 700; margin-bottom: 20px; }
         
         /* Modals & Utils */
-        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: center; backdrop-filter: blur(8px); opacity: 0; transition: 0.3s; padding: 24px; overflow-y: auto;}
+        .modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 3000; justify-content: center; align-items: flex-start; backdrop-filter: blur(8px); opacity: 0; transition: 0.3s; padding: 40px 24px 24px; overflow-y: auto;}
         .modal.show { opacity: 1; }
-        .modal-content { background: white; padding: 40px; border-radius: 24px; width: 95%; max-width: 500px; transform: scale(0.95); transition: 0.3s; position: relative; }
+        .modal-content { background: white; padding: 40px; border-radius: 24px; width: 95%; max-width: 500px; transform: scale(0.95); transition: 0.3s; position: relative; max-height: calc(100vh - 64px); overflow-y: auto; margin: 0 auto; }
         .modal.show .modal-content { transform: scale(1); }
         .close-modal { position: absolute; top: 20px; right: 20px; background: #f0f0f0; border: none; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; color: var(--gray); transition: 0.2s;}
         .close-modal:hover { background: #e0e0e0; color: var(--dark); transform: rotate(90deg); }
@@ -286,10 +918,12 @@
             .cards-grid.list-view .property-card { flex-direction: column; }
             .cards-grid.list-view .carousel-wrapper { width: 100%; height: 220px; min-height: 220px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
             .cards-grid.list-view .status-badge { right: 15px; left: auto; }
-            .modal { padding: 12px; align-items: flex-start; }
+            .modal { padding: 24px 12px 12px; align-items: flex-start; }
             .modal-content { width: 100%; padding: 24px 18px; }
-            .booking-modal-content { max-height: calc(100vh - 24px); border-radius: 20px; }
+            .booking-modal-content { max-height: calc(100vh - 36px); border-radius: 20px; }
             .booking-modal-grid { grid-template-columns: 1fr; gap: 12px; }
+            .modal-overlay { padding: 24px 12px 12px; }
+            .modal-overlay .modal-content { max-height: calc(100vh - 36px); }
         }
 
         /* Add Property Form Enhancements */
@@ -306,10 +940,222 @@
         @keyframes slideDownProof { from { transform: translateY(0); opacity: 1; } to { transform: translateY(150%); opacity: 0; } }
 
         /* Responsive */
+        @media (max-width: 1200px) {
+            .nav-container,
+            .dashboard-container {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+            .portal-header {
+                flex-wrap: wrap;
+                gap: 16px;
+                border-radius: 28px;
+                padding: 18px;
+            }
+            .sync-indicator {
+                width: 100%;
+                justify-content: flex-start;
+            }
+            .guest-sales-hero,
+            .reward-wheel-layout {
+                grid-template-columns: 1fr;
+            }
+            .reward-wheel-shell {
+                width: min(100%, 320px);
+            }
+            #guestExclusiveMapArea {
+                height: 520px !important;
+            }
+        }
+
         @media (max-width: 900px) {
-            .hero-content { grid-template-columns: 1fr; text-align: center; }
-            .hero-text h1 { font-size: 3rem; }
-            .hero-text p { margin: 0 auto 30px; }
-            .host-container { grid-template-columns: 1fr; }
-            .nav-links { display: none; }
+            .nav-container {
+                padding-top: 12px;
+                padding-bottom: 12px;
+            }
+            .brand {
+                font-size: 1.2rem;
+            }
+            .nav-links {
+                display: none;
+            }
+            .hero {
+                min-height: auto;
+                padding: 28px 16px 40px;
+            }
+            .hero-content {
+                grid-template-columns: 1fr;
+                text-align: center;
+                gap: 28px;
+            }
+            .hero-text h1 {
+                font-size: 3rem;
+            }
+            .hero-text p {
+                margin: 0 auto 24px;
+                font-size: 1rem;
+            }
+            .hero-text > div[style*="display: flex; gap: 15px"] {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            .hero-text > div[style*="display: flex; gap: 15px"] .btn-primary,
+            .hero-text > div[style*="display: flex; gap: 15px"] .btn-outline {
+                width: 100%;
+                justify-content: center;
+            }
+            .search-widget {
+                padding: 22px 18px;
+                border-radius: 20px;
+            }
+            .search-widget form > div[style*="display: grid; grid-template-columns: 1fr 1fr"] {
+                grid-template-columns: 1fr !important;
+            }
+            .widget-tabs {
+                justify-content: center;
+            }
+            .trust-section,
+            .host-section,
+            .raffle-promo {
+                padding-left: 16px;
+                padding-right: 16px;
+            }
+            .host-container,
+            .guest-sales-hero,
+            .guest-assurance-band,
+            .reward-wheel-layout,
+            .guest-offer-stack,
+            .prop-details-grid {
+                grid-template-columns: 1fr;
+            }
+            .guest-sales-copy {
+                padding: 28px 20px;
+            }
+            .guest-sales-copy h1 {
+                font-size: 2.5rem;
+            }
+            .reward-header h2 {
+                font-size: 1.95rem;
+            }
+            .portal-header {
+                padding: 16px;
+                margin: 12px auto 24px;
+            }
+            .role-toggle,
+            .mgmt-tabs {
+                overflow-x: auto;
+                width: 100%;
+            }
+            .role-btn,
+            .mgmt-tab {
+                white-space: nowrap;
+            }
+            .panel,
+            .calc-box,
+            .guest-sales-card,
+            .guest-benefit-card,
+            .guest-assurance-item,
+            .raffle-box {
+                padding: 22px 18px;
+            }
+            .kpi-grid,
+            .stats-grid,
+            .cards-grid {
+                gap: 18px;
+            }
+            .cards-grid {
+                grid-template-columns: 1fr;
+            }
+            .card-content {
+                padding: 18px;
+            }
+            .social-proof-card {
+                width: min(320px, calc(100vw - 32px));
+            }
+            #social-proof-container,
+            #notification-container,
+            #guestExclusiveToastContainer {
+                left: 12px;
+                right: 12px;
+                bottom: 12px;
+                top: auto;
+            }
+            #notification-container {
+                left: auto;
+                top: 12px;
+                right: 12px;
+            }
+            .notification {
+                width: min(360px, calc(100vw - 24px));
+            }
+            #guestExclusiveMapArea {
+                height: 420px !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            #homeView,
+            #portalView {
+                padding-top: 64px;
+            }
+            .hero-text h1,
+            .guest-sales-copy h1,
+            .raffle-promo h2 {
+                font-size: 2.2rem !important;
+            }
+            .hero-text p,
+            .guest-sales-copy p,
+            .raffle-box p {
+                font-size: 0.95rem !important;
+            }
+            .btn-primary,
+            .btn-outline {
+                padding: 12px 18px;
+                font-size: 0.95rem;
+            }
+            .portal-header,
+            .panel,
+            .kpi-card,
+            .search-widget,
+            .guest-sales-copy,
+            .guest-sales-card,
+            .guest-benefit-card,
+            .guest-assurance-item,
+            .raffle-box {
+                border-radius: 20px;
+            }
+            .kpi-value,
+            .calc-result,
+            .winner-display {
+                font-size: 2rem;
+            }
+            .carousel-wrapper {
+                height: 200px;
+            }
+            .amenities-container {
+                gap: 8px;
+            }
+            .amenity-tag {
+                font-size: 0.78rem;
+                padding: 7px 12px;
+            }
+            .guest-proof-strip div {
+                min-width: 100%;
+            }
+            .reward-side-box,
+            .reward-result-box {
+                padding: 18px;
+                border-radius: 20px;
+            }
+            .reward-actions {
+                flex-direction: column;
+            }
+            .reward-actions .btn-primary,
+            .reward-actions .btn-outline {
+                width: 100%;
+                justify-content: center;
+            }
+            #guestExclusiveMapArea {
+                height: 340px !important;
+            }
         }
