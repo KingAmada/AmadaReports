@@ -57,7 +57,7 @@
     async function switchView(view) {
         document.getElementById('homeView').style.display = view === 'home' ? 'block' : 'none';
         document.getElementById('topBanner').style.display = view === 'home' ? 'flex' : 'none';
-        document.getElementById('mainHeader').style.display = view === 'home' ? 'block' : 'none';
+        document.getElementById('mainHeader').style.display = (view === 'home' || view === 'guest') ? 'block' : 'none';
         document.getElementById('guestView').style.display = view === 'guest' ? 'block' : 'none';
         
         const portal = document.getElementById('portalView');
