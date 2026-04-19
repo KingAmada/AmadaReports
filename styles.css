@@ -185,6 +185,7 @@
             color: #111111;
             overflow-x: hidden;
             scroll-behavior: smooth;
+            padding-top: 72px;
         }
         .glass-light {
             background: rgba(255, 255, 255, 0.85);
