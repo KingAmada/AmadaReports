@@ -14,9 +14,15 @@
     <meta property="og:title" content="Bookily Engine | Premium Booking & Property Management">
     <meta property="og:description" content="Join the elite network of property owners. Automate your shortlet business and increase revenue by 40%.">
     <meta property="og:type" content="website">
+    <meta name="theme-color" content="#FF385C">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Bookily">
     
     <!-- Favicon (Inline SVG) -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-192.svg">
     
     <!-- Fonts & Icons -->
     <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -96,6 +102,7 @@
                 <a href="#" onclick="switchView('home'); return false;">Home</a>
                 <a href="#" onclick="openHostModal(); return false;">List Your Property</a>
                 <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
+                <button id="installAppButton" class="btn-outline install-app-button" onclick="promptPwaInstall()" hidden><i class="fa-solid fa-download"></i> Install App</button>
                 <button class="btn-outline" onclick="openLoginModal()"><i class="fa-solid fa-lock"></i> Portal Login</button>
                 <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Become a Host</button>
             </div>
@@ -1149,6 +1156,16 @@
 
     <div id="notification-container"></div>
     <div id="social-proof-container"></div>
+    <div id="pwaInstallPrompt" class="pwa-install-prompt" hidden>
+        <div class="pwa-install-copy">
+            <strong>Install Bookily</strong>
+            <span>Save it to your home screen for faster booking and offline access.</span>
+        </div>
+        <div class="pwa-install-actions">
+            <button type="button" class="btn-primary" onclick="promptPwaInstall()"><i class="fa-solid fa-download"></i> Install</button>
+            <button type="button" class="btn-outline" onclick="dismissPwaInstallPrompt()">Not now</button>
+        </div>
+    </div>
 
 <script src="app.js"></script>
 </body>

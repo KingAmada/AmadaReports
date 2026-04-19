@@ -130,6 +130,71 @@
         return `${mins}:${secs}`;
     }
 
+    let deferredPwaInstallPrompt = null;
+    let pwaInstallDismissed = false;
+
+    function setPwaInstallVisibility(visible) {
+        const headerButton = document.getElementById('installAppButton');
+        const floatingPrompt = document.getElementById('pwaInstallPrompt');
+        const canShow = visible && !pwaInstallDismissed;
+        if (headerButton) headerButton.hidden = !canShow;
+        if (floatingPrompt) floatingPrompt.hidden = !canShow;
+    }
+
+    function dismissPwaInstallPrompt() {
+        pwaInstallDismissed = true;
+        setPwaInstallVisibility(false);
+    }
+
+    async function promptPwaInstall() {
+        if (!deferredPwaInstallPrompt) {
+            if (window.app?.showNotification) {
+                window.app.showNotification('Install is available when your browser offers the app prompt. If you are on iPhone, use Share > Add to Home Screen.', 'info');
+            } else {
+                alert('Install is available when your browser offers the app prompt. If you are on iPhone, use Share > Add to Home Screen.');
+            }
+            return;
+        }
+
+        deferredPwaInstallPrompt.prompt();
+        const { outcome } = await deferredPwaInstallPrompt.userChoice;
+        if (outcome === 'accepted') {
+            dismissPwaInstallPrompt();
+        }
+        deferredPwaInstallPrompt = null;
+        setPwaInstallVisibility(false);
+    }
+
+    async function registerBookilyServiceWorker() {
+        const isInstallableOrigin = window.location.protocol === 'https:' || ['localhost', '127.0.0.1'].includes(window.location.hostname);
+        if (!('serviceWorker' in navigator) || !isInstallableOrigin) return;
+        try {
+            await navigator.serviceWorker.register('./sw.js');
+        } catch (error) {
+            console.warn('Service worker registration failed:', error);
+        }
+    }
+
+    window.addEventListener('beforeinstallprompt', event => {
+        event.preventDefault();
+        deferredPwaInstallPrompt = event;
+        pwaInstallDismissed = false;
+        setPwaInstallVisibility(true);
+    });
+
+    window.addEventListener('appinstalled', () => {
+        deferredPwaInstallPrompt = null;
+        dismissPwaInstallPrompt();
+        if (window.app?.showNotification) {
+            window.app.showNotification('Bookily installed successfully.', 'success');
+        }
+    });
+
+    window.addEventListener('load', () => {
+        registerBookilyServiceWorker();
+        setPwaInstallVisibility(false);
+    });
+
     let tickSound = null;
 
     function setupSounds() {
