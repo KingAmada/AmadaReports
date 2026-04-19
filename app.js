@@ -159,15 +159,15 @@
             terms: {
                 title: 'Terms and Conditions',
                 body: `
-                    <p>By creating an account, listing a property, or using Amada Stays to book accommodation, you agree to provide accurate information, keep your login credentials secure, and comply with all applicable laws and house rules.</p>
+                    <p>By creating an account, listing a property, or using Bookily Stays to book accommodation, you agree to provide accurate information, keep your login credentials secure, and comply with all applicable laws and house rules.</p>
                     <p>Hosts are responsible for listing accuracy, lawful occupancy, and maintaining safe, habitable spaces. Guests are responsible for timely payment, lawful use of the property, and any damages outside normal wear and tear.</p>
-                    <p>Amada Stays may suspend access, remove listings, or restrict bookings where there is fraud, misuse, policy breach, non-payment, or legal risk. Refunds, caution fees, and access credentials may be reviewed against recorded booking data and internal approval workflows.</p>
+                    <p>Bookily Stays may suspend access, remove listings, or restrict bookings where there is fraud, misuse, policy breach, non-payment, or legal risk. Refunds, caution fees, and access credentials may be reviewed against recorded booking data and internal approval workflows.</p>
                 `
             },
             privacy: {
                 title: 'Privacy Statement',
                 body: `
-                    <p>Amada Stays collects only the information needed to run bookings, host onboarding, operations, finance workflows, and team access control. This may include names, email addresses, phone numbers, booking dates, payment records, staff IDs, and property details.</p>
+                    <p>Bookily Stays collects only the information needed to run bookings, host onboarding, operations, finance workflows, and team access control. This may include names, email addresses, phone numbers, booking dates, payment records, staff IDs, and property details.</p>
                     <p>Your information is used to manage reservations, generate receipts, record financial activity, support role-based access, and improve service delivery. We do not request unnecessary data and we aim to store operational records securely.</p>
                     <p>By using the platform, you acknowledge that booking, receipt, refund, and dashboard data may be processed for accounting, security, reporting, and service management purposes. If your organization needs a formal privacy addendum, that should be issued separately by the operator.</p>
                 `
@@ -231,7 +231,7 @@
     }
 
 
-    // --- THE ENGINE LOGIC (Refactored AmadaApp) ---
+    // --- THE ENGINE LOGIC (Refactored Bookily Engine App) ---
     class AmadaApp {
         constructor() {
             this.supabase = window.supabase?.createClient
@@ -713,7 +713,7 @@
                 price,
                 type,
                 status,
-                hostEmail: 'sarki@amada.com',
+                hostEmail: 'sarki@bookily.com',
                 guestName: guestName || null,
                 accessCode: null,
                 coords: { lat, lng },
@@ -772,14 +772,14 @@
         getSystemHostRecord() {
             return {
                 name: 'System Admin',
-                email: 'admin@amada.com',
+                email: 'admin@bookily.com',
                 phone: '',
                 password: 'demo-admin'
             };
         }
 
         getLocalBackupKey() {
-            return 'amada-engine-backup';
+            return 'bookily-engine-backup';
         }
 
         mergeRecordsByKey(primary, fallback, keyField = 'id') {
@@ -853,10 +853,10 @@
             }
 
             const hosts = [...this.hosts];
-            const needsSystemHost = this.inventory.some(item => item.hostEmail === 'admin@amada.com') ||
+            const needsSystemHost = this.inventory.some(item => item.hostEmail === 'admin@bookily.com') ||
                 this.teamMembers.some(member => (member.createdBy || '') === 'system');
 
-            if (needsSystemHost && !hosts.some(host => host.email === 'admin@amada.com')) {
+            if (needsSystemHost && !hosts.some(host => host.email === 'admin@bookily.com')) {
                 hosts.push(this.getSystemHostRecord());
             }
             return hosts;
@@ -985,7 +985,7 @@
 
         getTeamAuthEmail(phone) {
             const digits = String(phone || '').replace(/\D/g, '');
-            return digits ? `team-${digits}@amada.local` : '';
+            return digits ? `team-${digits}@bookily.local` : '';
         }
 
         async findTeamMemberByPhone(phone) {
@@ -1189,7 +1189,7 @@
         }
 
         mapPropertyToRow(property, hostIdByEmail) {
-            const hostId = hostIdByEmail.get(property.hostEmail || 'admin@amada.com');
+            const hostId = hostIdByEmail.get(property.hostEmail || 'admin@bookily.com');
             if (!hostId) return null;
 
             return {
@@ -1341,7 +1341,7 @@
                             price: Number(row.nightly_price) || 0,
                             type: row.property_type,
                             status: row.status || 'available',
-                            hostEmail: 'public@amada.com',
+                            hostEmail: 'public@bookily.com',
                             guestName: row.guest_name || null,
                             accessCode: row.access_code || null,
                             images: Array.isArray(row.images) ? row.images : [],
@@ -1363,7 +1363,7 @@
                         phone: row.phone || '',
                         password: row.password
                     }))
-                    .filter(host => host.email !== 'admin@amada.com');
+                    .filter(host => host.email !== 'admin@bookily.com');
 
                 const [
                     teamRows,
@@ -1397,7 +1397,7 @@
                     email: row.email || '',
                     phone: row.phone || '',
                     pin: row.pin,
-                    createdBy: hostEmailById.get(row.host_id) || 'admin@amada.com',
+                    createdBy: hostEmailById.get(row.host_id) || 'admin@bookily.com',
                     assignmentScope: row.assignment_scope || 'admin',
                     assignedPropertyId: row.assigned_property_id || '',
                     assignmentLabel: row.assignment_label || (row.assignment_scope === 'executive' ? 'Executive Office' : 'Admin Office'),
@@ -1412,7 +1412,7 @@
                         price: Number(row.nightly_price) || 0,
                         type: row.property_type,
                         status: row.status || 'available',
-                        hostEmail: hostEmailById.get(row.host_id) || 'admin@amada.com',
+                        hostEmail: hostEmailById.get(row.host_id) || 'admin@bookily.com',
                         guestName: row.guest_name || null,
                         accessCode: row.access_code || null,
                         images: Array.isArray(row.images) ? row.images : [],
@@ -1580,7 +1580,7 @@
 
                 const memberRows = this.teamMembers
                     .map(member => {
-                        const createdByEmail = member.createdBy === 'system' ? 'admin@amada.com' : (member.createdBy || this.currentHostEmail || 'admin@amada.com');
+                        const createdByEmail = member.createdBy === 'system' ? 'admin@bookily.com' : (member.createdBy || this.currentHostEmail || 'admin@bookily.com');
                         const hostId = hostIdByEmail.get(createdByEmail);
                         if (!hostId) return null;
                         return {
@@ -1809,7 +1809,7 @@
             }
 
             this.saveLocalData();
-            this.showNotification(`Profile created successfully! Welcome to Amada Engine.`, "success");
+            this.showNotification(`Profile created successfully! Welcome to Bookily Engine.`, "success");
             await switchView('portal');
         }
 
@@ -2117,7 +2117,7 @@
                 this.getHostNameByEmail(this.currentHostEmail) ||
                 member.createdBy ||
                 this.currentHostEmail ||
-                'Amada Host';
+                'Bookily Host';
 
             const roundRect = (x, y, w, h, r) => {
                 ctx.beginPath();
@@ -2236,7 +2236,7 @@
             }
 
             ctx.fillStyle = '#ffffff';
-            writeText('Amada', 95, 105, { size: 44, weight: '700', color: '#ffffff' });
+            writeText('Bookily', 95, 105, { size: 44, weight: '700', color: '#ffffff' });
             writeText('Engine Staff ID', 95, 140, { size: 22, weight: '500', color: 'rgba(255,255,255,0.85)' });
             writeText(member.assignmentLabel || 'Admin Office', 95, 455, { size: 30, weight: '700', color: '#ffffff' });
             wrapText(property?.loc || 'Abuja, Nigeria', 95, 495, 250, 32, { size: 22, color: 'rgba(255,255,255,0.82)' });
@@ -2264,7 +2264,7 @@
             writeText('Valid for internal operations and access control only.', 470, 635, { size: 18, color: '#888888' });
 
             const link = document.createElement('a');
-            link.download = `amada-staff-id-${member.staffId}.png`;
+            link.download = `bookily-staff-id-${member.staffId}.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
             this.showNotification(`Staff ID downloaded for ${member.name}.`, "success");
@@ -3331,7 +3331,7 @@
             return `
                 <html>
                 <head>
-                    <title>Amada Receipt</title>
+                    <title>Bookily Receipt</title>
                     <style>
                         body { font-family: 'Poppins', Arial, sans-serif; background:#f5f5f5; padding:24px; color:#1a1a1a; }
                         .sheet { max-width:760px; margin:0 auto; background:#fff; border-radius:24px; padding:32px; box-shadow:0 20px 50px rgba(0,0,0,0.08); }
@@ -3351,7 +3351,7 @@
                     <div class="sheet">
                         <div class="hero">
                             <div>
-                                <div class="brand">Amada Stays</div>
+                                <div class="brand">Bookily Stays</div>
                                 <div class="sub">Booking Receipt</div>
                             </div>
                             <div style="text-align:right;">
@@ -3443,7 +3443,7 @@
             ctx.fillStyle = '#ffffff';
             radiusRect(70, 70, 1060, 1460, 36, true);
 
-            writeText('Amada Stays', 130, 170, { size: 54, weight: '700', color: '#ff385c' });
+            writeText('Bookily Stays', 130, 170, { size: 54, weight: '700', color: '#ff385c' });
             writeText('Booking Receipt', 130, 220, { size: 24, color: '#666666' });
 
             ctx.fillStyle = '#fff0f3';
@@ -3515,7 +3515,7 @@
             }
 
             const link = document.createElement('a');
-            link.download = `amada-receipt-${data.receiptNumber}.png`;
+            link.download = `bookily-receipt-${data.receiptNumber}.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
         }
@@ -3568,7 +3568,7 @@
             ctx.fillStyle = '#ffffff';
             radiusRect(70, 70, 1060, 1360, 36, true);
 
-            writeText('Amada Stays', 130, 170, { size: 54, weight: '700', color: '#ff385c' });
+            writeText('Bookily Stays', 130, 170, { size: 54, weight: '700', color: '#ff385c' });
             writeText('Reward Receipt', 130, 220, { size: 24, color: '#666666' });
 
             ctx.fillStyle = '#fff0f3';
@@ -3621,7 +3621,7 @@
             writeText(data.checkOut || 'N/A', 1040, 1297, { size: 30, weight: '700', align: 'right' });
 
             const link = document.createElement('a');
-            link.download = `amada-reward-${data.rewardReceiptNumber}.png`;
+            link.download = `bookily-reward-${data.rewardReceiptNumber}.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
         }
@@ -4912,7 +4912,7 @@
                 qrEl.innerHTML = '';
                 try {
                     new QRCode(qrEl, {
-                        text: `Amada Reward: ${prize.text}\nCode: AMADA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                        text: `Bookily Reward: ${prize.text}\nCode: BOOKILY-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
                         width: 120,
                         height: 120,
                         colorDark: '#111111',
@@ -4957,7 +4957,7 @@
 
             try {
                 new QRCode(qrEl, {
-                    text: `Amada Reward: ${prize.label || prize.text}\nCode: AMADA-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+                    text: `Bookily Reward: ${prize.label || prize.text}\nCode: BOOKILY-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
                     width: 120,
                     height: 120,
                     colorDark: '#111111',
@@ -6168,7 +6168,7 @@
                     <div class="sheet">
                         <div class="header">
                             <div>
-                                <div class="brand">Amada Stays</div>
+                                <div class="brand">Bookily Stays</div>
                                 <h1 style="margin:10px 0 6px 0;">${context.title}</h1>
                                 <div class="muted">${context.dateFrom} to ${context.dateTo}</div>
                             </div>
