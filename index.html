@@ -99,11 +99,11 @@
         <div class="nav-container">
             <a href="#" class="brand" onclick="switchView('home'); return false;"><i class="fa-solid fa-crown"></i> Bookily <span>Engine</span></a>
             <div class="nav-links">
-                <a href="#" onclick="switchView('home'); return false;">Home</a>
-                <a href="#" onclick="openHostModal(); return false;">List Your Property</a>
                 <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
+                <a href="#" onclick="switchView('host'); return false;">List Your Property</a>
+                <button class="btn-outline" onclick="openGuestAccessModal()"><i class="fa-solid fa-key"></i> Guest Login</button>
                 <button id="installAppButton" class="btn-outline install-app-button" onclick="promptPwaInstall()" hidden><i class="fa-solid fa-download"></i> Install App</button>
-                <button class="btn-outline" onclick="openLoginModal()"><i class="fa-solid fa-lock"></i> Portal Login</button>
+                <button class="btn-outline" onclick="openLoginModal()"><i class="fa-solid fa-lock"></i> Host Login</button>
                 <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Become a Host</button>
             </div>
         </div>
@@ -112,7 +112,7 @@
     <!-- ========================================== -->
     <!-- VIEW 1: MARKETING HOMEPAGE (CONVERSION UI) -->
     <!-- ========================================== -->
-    <main id="homeView">
+    <main id="homeView" style="display:none;">
         
         <!-- HERO SECTION -->
         <section class="hero">
@@ -122,7 +122,7 @@
                     <p>The elite property management engine and booking platform. Guests find their perfect stay; Owners put their revenue on autopilot.</p>
                     <div style="display: flex; gap: 15px; margin-top: 20px;">
                         <button class="btn-primary" style="padding: 15px 35px; font-size: 1.1rem;" onclick="document.getElementById('searchLoc').focus()">Book a Stay</button>
-                        <button class="btn-outline" style="border-color: white; color: white;" onclick="document.getElementById('host').scrollIntoView({behavior: 'smooth'})">Maximize Yield</button>
+                        <button class="btn-outline" style="border-color: white; color: white;" onclick="switchView('host')">Maximize Yield</button>
                     </div>
                 </div>
 
@@ -199,23 +199,100 @@
             </div>
         </section>
 
-        <!-- HOST ACQUISITION ENGINE -->
-        <section id="host" class="host-section">
-            <div class="host-container">
-                <div>
-                    <span style="color:var(--primary); font-weight:700; letter-spacing:1px; text-transform:uppercase;">For Property Owners</span>
-                    <h2 style="font-family:var(--font-heading); font-size:3rem; margin:15px 0; line-height:1.2;">Turn Your Space into a Profit Engine.</h2>
-                    <p style="font-size:1.1rem; color:var(--gray); margin-bottom:30px;">Stop managing keys and chasing payments. Bookily Engine integrates smart locks, dynamic pricing algorithms, and multi-channel syncing to boost your yields by up to 45% while you sleep.</p>
-                    
-                    <ul style="list-style:none; margin-bottom:40px;">
-                        <li style="margin-bottom:15px; display:flex; gap:10px;"><i class="fa-solid fa-circle-check" style="color:var(--success); margin-top:5px;"></i> <strong>AI Dynamic Pricing:</strong> Adjusts rates based on real-time Abuja demand.</li>
-                        <li style="margin-bottom:15px; display:flex; gap:10px;"><i class="fa-solid fa-circle-check" style="color:var(--success); margin-top:5px;"></i> <strong>Smart Lock Sync:</strong> Generates unique entry codes for every booking.</li>
-                        <li style="margin-bottom:15px; display:flex; gap:10px;"><i class="fa-solid fa-circle-check" style="color:var(--success); margin-top:5px;"></i> <strong>Transparent Dashboard:</strong> See P&L, occupancy, and payouts live.</li>
-                    </ul>
-                    <button class="btn-primary" onclick="openHostModal()">Register & Set Up Profile</button>
+        <footer style="background:var(--dark); color:white; padding:60px 20px; text-align:center;">
+            <div style="font-size:2rem; font-family:var(--font-heading); margin-bottom:20px;">Bookily <span style="font-weight:300;">Engine</span></div>
+            <p style="color:#aaa; max-width:500px; margin:0 auto 30px;">The masterclass in shortlet property management and luxury bookings.</p>
+            <div style="display:flex; justify-content:center; gap:20px; margin-bottom:30px;">
+                <i class="fa-brands fa-cc-visa" style="font-size:2rem; color:#aaa;"></i>
+                <i class="fa-brands fa-cc-mastercard" style="font-size:2rem; color:#aaa;"></i>
+                <i class="fa-brands fa-airbnb" style="font-size:2rem; color:#aaa;"></i>
+            </div>
+            <p style="color:#666; font-size:0.9rem;">&copy; 2024 Bookily Stays. All rights reserved.</p>
+        </footer>
+    </main>
+
+    <main id="hostView" style="display:none;">
+        <section class="host-page-hero">
+            <div class="host-page-shell host-page-hero-grid">
+                <div class="host-page-copy">
+                    <span class="host-kicker"><i class="fa-solid fa-building-circle-check"></i> Dedicated For Hosts</span>
+                    <h1>List Your Property. Let Bookily Fill It, Price It, And Run It.</h1>
+                    <p>Turn your apartment into a high-performing shortlet business with a page built to attract serious hosts. We handle demand capture, smart pricing, guest access flow, and the day-to-day operating pressure that slows revenue down.</p>
+                    <div class="host-page-actions">
+                        <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Register Your Property</button>
+                        <button class="btn-outline host-dark-outline" onclick="document.getElementById('hostRevenueEstimator').scrollIntoView({behavior: 'smooth'})">Estimate Revenue</button>
+                    </div>
+                    <div class="host-proof-band">
+                        <div><strong>45+</strong><span>Premium Units Managed</span></div>
+                        <div><strong>₦850M+</strong><span>Revenue Generated</span></div>
+                        <div><strong>40%</strong><span>Higher Yield Potential</span></div>
+                    </div>
                 </div>
-                
-                <!-- INTERACTIVE REVENUE ESTIMATOR -->
+                <div class="host-page-showcase">
+                    <div class="host-showcase-card host-showcase-primary">
+                        <span>Tonight's Snapshot</span>
+                        <strong>18 units occupied</strong>
+                        <p>Inventory synced, rates adjusted, access codes ready, and upcoming check-ins already routed.</p>
+                    </div>
+                    <div class="host-showcase-stack">
+                        <div class="host-showcase-card">
+                            <span>Automation Layer</span>
+                            <strong>Dynamic pricing + lock sync</strong>
+                        </div>
+                        <div class="host-showcase-card">
+                            <span>Operations Layer</span>
+                            <strong>Bookings, payouts, reporting</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="host-page-section">
+            <div class="host-page-shell">
+                <div class="host-section-heading">
+                    <span>Why Hosts Join</span>
+                    <h2>A dedicated page built to convert owners, not just open a form.</h2>
+                </div>
+                <div class="host-benefits-grid">
+                    <article class="host-benefit-card">
+                        <i class="fa-solid fa-chart-line"></i>
+                        <h3>Revenue First</h3>
+                        <p>Rates adjust around real Abuja demand so your unit is not underpriced on peak days or stale on weak ones.</p>
+                    </article>
+                    <article class="host-benefit-card">
+                        <i class="fa-solid fa-key"></i>
+                        <h3>Access Automation</h3>
+                        <p>Every booking can flow into access-code operations without manual key handovers or fragmented guest messaging.</p>
+                    </article>
+                    <article class="host-benefit-card">
+                        <i class="fa-solid fa-layer-group"></i>
+                        <h3>Operational Visibility</h3>
+                        <p>Track occupancy, payouts, and property performance in one place instead of piecing reports together manually.</p>
+                    </article>
+                    <article class="host-benefit-card">
+                        <i class="fa-solid fa-headset"></i>
+                        <h3>Guest Handling</h3>
+                        <p>Bookings, receipts, promotions, and stay incentives run through one guest-facing engine that keeps demand active.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="hostRevenueEstimator" class="host-page-section host-page-alt">
+            <div class="host-page-shell host-estimator-layout">
+                <div>
+                    <div class="host-section-heading left">
+                        <span>Revenue Estimator</span>
+                        <h2>Model what your unit can earn before you commit.</h2>
+                        <p>Use the estimator to see the kind of monthly revenue range your property could hit when it is positioned and managed correctly.</p>
+                    </div>
+                    <ul class="host-check-list">
+                        <li><i class="fa-solid fa-circle-check"></i> Shortlet-focused pricing logic</li>
+                        <li><i class="fa-solid fa-circle-check"></i> Occupancy-based revenue forecast</li>
+                        <li><i class="fa-solid fa-circle-check"></i> Better clarity before onboarding</li>
+                    </ul>
+                </div>
                 <div class="calc-box">
                     <h3 style="font-size:1.5rem; margin-bottom:10px;">Estimate Your Earnings</h3>
                     <p style="color:var(--gray); font-size:0.9rem;">See how much you could make by joining the Bookily Engine.</p>
@@ -246,16 +323,45 @@
             </div>
         </section>
 
-        <footer style="background:var(--dark); color:white; padding:60px 20px; text-align:center;">
-            <div style="font-size:2rem; font-family:var(--font-heading); margin-bottom:20px;">Bookily <span style="font-weight:300;">Engine</span></div>
-            <p style="color:#aaa; max-width:500px; margin:0 auto 30px;">The masterclass in shortlet property management and luxury bookings.</p>
-            <div style="display:flex; justify-content:center; gap:20px; margin-bottom:30px;">
-                <i class="fa-brands fa-cc-visa" style="font-size:2rem; color:#aaa;"></i>
-                <i class="fa-brands fa-cc-mastercard" style="font-size:2rem; color:#aaa;"></i>
-                <i class="fa-brands fa-airbnb" style="font-size:2rem; color:#aaa;"></i>
+        <section class="host-page-section">
+            <div class="host-page-shell">
+                <div class="host-section-heading">
+                    <span>How It Works</span>
+                    <h2>From listing to live operations in three steps.</h2>
+                </div>
+                <div class="host-steps-grid">
+                    <article class="host-step-card">
+                        <strong>01</strong>
+                        <h3>Submit Your Property</h3>
+                        <p>Register the unit, area, and ownership details so we can qualify the listing correctly.</p>
+                    </article>
+                    <article class="host-step-card">
+                        <strong>02</strong>
+                        <h3>Set Up The Engine</h3>
+                        <p>We align pricing, inventory structure, guest access workflow, and the operational dashboard.</p>
+                    </article>
+                    <article class="host-step-card">
+                        <strong>03</strong>
+                        <h3>Start Monetizing</h3>
+                        <p>Your property enters the guest funnel and management engine with clearer reporting and stronger occupancy handling.</p>
+                    </article>
+                </div>
             </div>
-            <p style="color:#666; font-size:0.9rem;">&copy; 2024 Bookily Stays. All rights reserved.</p>
-        </footer>
+        </section>
+
+        <section class="host-page-section host-cta-section">
+            <div class="host-page-shell host-cta-box">
+                <div>
+                    <span>Ready To List?</span>
+                    <h2>Give your property a page and system built to sell it.</h2>
+                    <p>Stop hiding host conversion inside a modal. Bring owners into a dedicated acquisition flow and register the property when they are ready.</p>
+                </div>
+                <div class="host-page-actions">
+                    <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-file-signature"></i> Register & Set Up Profile</button>
+                    <button class="btn-outline host-light-outline" onclick="switchView('home')">Back To Home</button>
+                </div>
+            </div>
+        </section>
     </main>
 
     <!-- ========================================== -->
@@ -263,6 +369,19 @@
     <!-- ========================================== -->
     <main id="guestView" style="display:none;">
         <div id="guestExclusivePage" class="antialiased selection:bg-amada-gold selection:text-white bg-[#FAFAFA] text-amada-dark min-h-screen overflow-x-hidden">
+            <div id="guestExperienceLoader" class="guest-experience-loader">
+                <div class="guest-loader-panel">
+                    <div class="guest-loader-spinner-wrap">
+                        <div class="guest-loader-spinner"></div>
+                        <span>Loading premium stays...</span>
+                    </div>
+                    <div class="guest-loader-copy">
+                        <p class="guest-loader-eyebrow">Bookily Rewards</p>
+                        <h2 id="guestLoaderQuote">Every Friday we hold a raffle draw and 10 guests win Free Nights, 100% Refund, 50% off next booking, Free Lunch and more.</h2>
+                    </div>
+                    <div id="guestLoaderTestimonials" class="guest-loader-testimonials"></div>
+                </div>
+            </div>
             <div id="guestExclusiveTopBanner" class="urgency-banner-red text-white text-center py-2 px-4 sticky top-0 z-50 flex flex-col sm:flex-row justify-center items-center gap-2 sm:gap-4 border-b-2 border-red-900 transition-colors duration-500">
                 <span class="animate-pulse-fast"><i class="fa-solid fa-fire text-yellow-300 text-xl"></i></span>
                 <p class="text-sm sm:text-base font-bold font-serif tracking-wide drop-shadow-md">
@@ -343,6 +462,42 @@
                 </div>
             </section>
 
+            <section class="guest-stats-bar-wrap">
+                <div class="guest-stats-bar">
+                    <div class="guest-stat-pill">
+                        <strong>20,230+</strong>
+                        <span>Guests</span>
+                    </div>
+                    <div class="guest-stat-pill">
+                        <strong>365+</strong>
+                        <span>Free Nights Won</span>
+                    </div>
+                    <div class="guest-stat-pill">
+                        <strong>1,200+</strong>
+                        <span>Guests Got 50% Off</span>
+                    </div>
+                    <div class="guest-stat-pill">
+                        <strong>6,789</strong>
+                        <span>Late Checkout</span>
+                    </div>
+                    <div class="guest-stat-pill">
+                        <strong>2,657</strong>
+                        <span>Got 10% Off</span>
+                    </div>
+                    <div class="guest-stat-pill">
+                        <strong>4,656</strong>
+                        <span>Free Lunch</span>
+                    </div>
+                </div>
+            </section>
+
+            <section class="guest-raffle-banner-wrap">
+                <div class="guest-raffle-banner">
+                    <i class="fa-solid fa-ticket"></i>
+                    <p>Every Friday 9:00PM we have a raffle draw for all our guests and 10 of them will Win Gifts. (<span id="guestRaffleCount">13</span>+ Guests already in this week Raffle.)</p>
+                </div>
+            </section>
+
             <section class="py-16 px-6 sm:px-12 max-w-7xl mx-auto relative z-20">
                 <div class="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-5 mb-7">
                     <div>
@@ -369,11 +524,10 @@
                 </div>
 
                 <div class="bg-white rounded-[1.8rem] p-4 md:p-5 shadow-[0_12px_40px_rgba(0,0,0,0.08)] border border-gray-100 mb-8">
-                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto] gap-3 items-end">
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[repeat(6,minmax(0,1fr))_auto] gap-3 items-end">
                         <label class="guest-exclusive-filter-field">
-                            <span>Rooms</span>
                             <select id="guestExclusiveRoomsFilter" onchange="if(window.app) window.app.updateExclusiveFilter('rooms', this.value)">
-                                <option value="all">All Rooms</option>
+                                <option value="all">Rooms</option>
                                 <option value="0">Studio</option>
                                 <option value="1">1 Bedroom</option>
                                 <option value="2">2 Bedrooms</option>
@@ -382,9 +536,8 @@
                             </select>
                         </label>
                         <label class="guest-exclusive-filter-field">
-                            <span>Price Range</span>
                             <select id="guestExclusivePriceRangeFilter" onchange="if(window.app) window.app.updateExclusiveFilter('priceRange', this.value)">
-                                <option value="all">All Prices</option>
+                                <option value="all">Price Range</option>
                                 <option value="0-50000">Up to ₦50,000</option>
                                 <option value="50001-100000">₦50,001 - ₦100,000</option>
                                 <option value="100001-150000">₦100,001 - ₦150,000</option>
@@ -393,27 +546,23 @@
                             </select>
                         </label>
                         <label class="guest-exclusive-filter-field">
-                            <span>Location</span>
                             <select id="guestExclusiveLocationFilter" onchange="if(window.app) window.app.updateExclusiveFilter('location', this.value)">
-                                <option value="all">All Locations</option>
+                                <option value="all">Location</option>
                             </select>
                         </label>
                         <label class="guest-exclusive-filter-field">
-                            <span>City</span>
                             <select id="guestExclusiveCityFilter" onchange="if(window.app) window.app.updateExclusiveFilter('city', this.value)">
-                                <option value="all">All Cities</option>
+                                <option value="all">City</option>
                             </select>
                         </label>
                         <label class="guest-exclusive-filter-field">
-                            <span>State</span>
                             <select id="guestExclusiveStateFilter" onchange="if(window.app) window.app.updateExclusiveFilter('state', this.value)">
-                                <option value="all">All States</option>
+                                <option value="all">State</option>
                             </select>
                         </label>
                         <label class="guest-exclusive-filter-field">
-                            <span>Sort By</span>
                             <select id="guestExclusiveSortSelect" onchange="if(window.app) window.app.updateExclusiveSort(this.value)">
-                                <option value="default">Recommended</option>
+                                <option value="default">Sort By</option>
                                 <option value="priceAsc">Price: Low to High</option>
                                 <option value="priceDesc">Price: High to Low</option>
                             </select>
@@ -428,30 +577,6 @@
 
                 <div id="guestExclusiveListingsGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10"></div>
                 <div id="guestExclusiveMapArea" class="hidden rounded-[2rem] overflow-hidden border border-gray-200 shadow-[0_12px_40px_rgba(0,0,0,0.08)] bg-white" style="height: 680px;"></div>
-            </section>
-
-            <section class="px-6 sm:px-12 max-w-7xl mx-auto relative z-20 mb-16">
-                <div class="bg-white rounded-[2rem] p-6 md:p-10 shadow-[0_12px_40px_rgba(0,0,0,0.08)] border border-gray-100">
-                    <div class="flex items-center gap-3 mb-3">
-                        <i class="fa-solid fa-receipt text-amada-red text-2xl"></i>
-                        <h3 class="text-3xl md:text-4xl font-black text-gray-900">Rewards & Receipts</h3>
-                    </div>
-                    <p class="text-gray-500 text-lg font-medium mb-8">Enter your phone number and booking PIN to claim unlocked rewards or download receipts after your spin.</p>
-                    <div class="grid grid-cols-1 xl:grid-cols-[1fr_1fr_auto] gap-4 items-end">
-                        <label class="guest-exclusive-reservation-field">
-                            <span>Phone Number</span>
-                            <input id="guestExclusiveLookupPhone" type="tel" placeholder="Phone Number">
-                        </label>
-                        <label class="guest-exclusive-reservation-field">
-                            <span>Booking PIN / Access Code</span>
-                            <input id="guestExclusiveLookupPin" type="password" placeholder="Booking PIN / Access Code">
-                        </label>
-                        <button type="button" onclick="if(window.app) window.app.lookupExclusiveReservations()" class="h-[78px] px-10 rounded-full bg-amada-red text-white font-black text-xl shadow-[0_10px_24px_rgba(211,47,47,0.3)] hover:bg-red-700 transition inline-flex items-center justify-center gap-3">
-                            <i class="fa-solid fa-magnifying-glass"></i> Find Reservations
-                        </button>
-                    </div>
-                    <div id="guestExclusiveReservationsArea" class="mt-8"></div>
-                </div>
             </section>
 
             <div id="guestExclusivePerksWidget" class="fixed bottom-4 right-4 z-40 glass-light border-2 border-amada-gold p-4 rounded-2xl shadow-[0_10px_40px_rgba(212,175,55,0.25)] w-72 transform transition-all duration-500 hidden md:block">
@@ -494,6 +619,48 @@
             </div>
 
             <div id="guestExclusiveToastContainer"></div>
+
+            <footer class="guest-footer">
+                <div class="guest-footer-shell">
+                    <div class="guest-footer-brand">
+                        <div class="guest-footer-logo"><i class="fa-solid fa-crown"></i> Bookily Engine</div>
+                        <p>Premium stays, verified host operations, guest access control, and modern booking workflows in one professional engine.</p>
+                        <div class="guest-footer-badges">
+                            <span><i class="fa-solid fa-shield-halved"></i> Verified Inventory</span>
+                            <span><i class="fa-solid fa-key"></i> Smart Access Flow</span>
+                            <span><i class="fa-solid fa-headset"></i> Concierge Support</span>
+                        </div>
+                    </div>
+                    <div class="guest-footer-links">
+                        <div>
+                            <h4>Explore</h4>
+                            <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
+                            <a href="#" onclick="switchView('host'); return false;">List Your Property</a>
+                            <a href="#" onclick="openGuestAccessModal(); return false;">Guest Login</a>
+                        </div>
+                        <div>
+                            <h4>Host</h4>
+                            <a href="#" onclick="openLoginModal(); return false;">Host Login</a>
+                            <a href="#" onclick="openHostModal(); return false;">Register Property</a>
+                            <a href="#" onclick="switchView('host'); return false;">Revenue Estimator</a>
+                        </div>
+                        <div>
+                            <h4>Trust</h4>
+                            <span>Secure reservations</span>
+                            <span>Automated receipts</span>
+                            <span>Managed stay operations</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="guest-footer-bottom">
+                    <span>&copy; 2026 Bookily Engine. All rights reserved.</span>
+                    <div>
+                        <span><i class="fa-brands fa-cc-visa"></i></span>
+                        <span><i class="fa-brands fa-cc-mastercard"></i></span>
+                        <span><i class="fa-brands fa-airbnb"></i></span>
+                    </div>
+                </div>
+            </footer>
 
             <div id="guestExclusiveBookingModal" class="modal-overlay">
                 <div class="modal-content bg-white w-full max-w-2xl rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(211,47,47,0.15)] relative border-2 border-red-100 transition-colors duration-300" id="guestExclusiveModalBox">
@@ -702,7 +869,7 @@
     <div id="loginModal" class="modal">
         <div class="modal-content" style="max-width:400px;">
             <button class="close-modal" onclick="closeModals()"><i class="fa-solid fa-times"></i></button>
-            <h2 style="font-family:var(--font-heading); margin-bottom:10px; text-align:center;">Portal Access</h2>
+            <h2 style="font-family:var(--font-heading); margin-bottom:10px; text-align:center;">Host Access</h2>
             <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:10px;">
                 <button class="w-tab active" style="flex:1; border:none; background:none; font-size:1rem;" onclick="toggleLoginType('host')" id="tabLoginHost">Host Login</button>
                 <button class="w-tab" style="flex:1; border:none; background:none; font-size:1rem; color:var(--gray);" onclick="toggleLoginType('staff')" id="tabLoginStaff">Team Access</button>
@@ -719,6 +886,26 @@
                 </div>
                 <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:15px;">Authorize Access</button>
             </form>
+        </div>
+    </div>
+
+    <div id="guestAccessModal" class="modal">
+        <div class="modal-content" style="max-width:720px;">
+            <button class="close-modal" onclick="closeModals()"><i class="fa-solid fa-times"></i></button>
+            <h2 style="font-family:var(--font-heading); margin-bottom:12px; text-align:center;">Guest Login</h2>
+            <p style="color:var(--gray); text-align:center; margin-bottom:24px;">Enter your phone number and access code to view your reservation, claim rewards, or download your receipt.</p>
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px; align-items:end;">
+                <label class="guest-exclusive-reservation-field">
+                    <input id="guestAccessPhone" type="tel" placeholder="Phone Number">
+                </label>
+                <label class="guest-exclusive-reservation-field">
+                    <input id="guestAccessCode" type="password" placeholder="Access Code">
+                </label>
+                <button type="button" onclick="submitGuestAccessLookup()" class="btn-primary" style="height:40px; justify-content:center; padding:0 22px;">
+                    <i class="fa-solid fa-magnifying-glass"></i> Access
+                </button>
+            </div>
+            <div id="guestAccessReservationsArea" style="margin-top:24px;"></div>
         </div>
     </div>
 

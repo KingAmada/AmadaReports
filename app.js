@@ -9,6 +9,7 @@
 
     const SUPABASE_URL = 'https://ozodqvrjzlcjgorntazt.supabase.co';
     const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96b2RxdnJqemxjamdvcm50YXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NDAxNDMsImV4cCI6MjA5MDUxNjE0M30.TC4eylpgt3jFaNYQosaAYp_l_ojVMrgtHTnce274tk0';
+    let activeViewRequestId = 0;
 
     let currentLoginMode = 'host';
     function toggleLoginType(type) {
@@ -30,6 +31,32 @@
     function openLoginModal() {
         document.getElementById('loginModal').style.display = 'flex';
         setTimeout(() => document.getElementById('loginModal').classList.add('show'), 10);
+    }
+
+    function openGuestAccessModal() {
+        const modal = document.getElementById('guestAccessModal');
+        if (!modal) return;
+        const phone = document.getElementById('guestAccessPhone');
+        const code = document.getElementById('guestAccessCode');
+        const output = document.getElementById('guestAccessReservationsArea');
+        if (phone) phone.value = '';
+        if (code) code.value = '';
+        if (output) output.innerHTML = '';
+        if(!window.appInitialized) {
+            window.app = new AmadaApp();
+            window.appInitialized = true;
+        }
+        modal.style.display = 'flex';
+        setTimeout(() => modal.classList.add('show'), 10);
+    }
+
+    async function submitGuestAccessLookup() {
+        if(!window.appInitialized) {
+            window.app = new AmadaApp();
+            window.appInitialized = true;
+        }
+        if (window.app?.ready) await window.app.ready;
+        window.app?.lookupGuestAccessReservations();
     }
 
     async function submitLogin() {
@@ -55,27 +82,43 @@
 
     // View Switcher (SPA Navigation)
     async function switchView(view) {
-        document.getElementById('homeView').style.display = view === 'home' ? 'block' : 'none';
-        document.getElementById('topBanner').style.display = view === 'home' ? 'flex' : 'none';
-        document.getElementById('mainHeader').style.display = (view === 'home' || view === 'guest') ? 'block' : 'none';
-        document.getElementById('guestView').style.display = view === 'guest' ? 'block' : 'none';
+        const requestId = ++activeViewRequestId;
+        const resolvedView = view === 'home' ? 'guest' : view;
+        document.getElementById('homeView').style.display = resolvedView === 'marketing' ? 'block' : 'none';
+        document.getElementById('hostView').style.display = resolvedView === 'host' ? 'block' : 'none';
+        document.getElementById('topBanner').style.display = resolvedView === 'marketing' ? 'flex' : 'none';
+        document.getElementById('mainHeader').style.display = (resolvedView === 'marketing' || resolvedView === 'host' || resolvedView === 'guest') ? 'block' : 'none';
+        document.getElementById('guestView').style.display = resolvedView === 'guest' ? 'block' : 'none';
         
         const portal = document.getElementById('portalView');
-        if(view === 'portal' || view === 'guest') {
-            portal.style.display = view === 'portal' ? 'block' : 'none';
+        if(resolvedView === 'portal' || resolvedView === 'guest') {
+            portal.style.display = resolvedView === 'portal' ? 'block' : 'none';
             if(!window.appInitialized) {
                 window.app = new AmadaApp();
                 window.appInitialized = true;
-            } else if (view === 'portal') {
+            } else if (resolvedView === 'portal') {
                 window.app.render();
             }
-            if (window.app?.ready) await window.app.ready;
-            if(view === 'guest' && window.app) {
+            if(resolvedView === 'guest' && window.app) {
+                window.app.showGuestExperienceLoader();
+                await Promise.all([
+                    window.app?.ready || Promise.resolve(),
+                    new Promise(resolve => setTimeout(resolve, 1200))
+                ]);
+                if (requestId !== activeViewRequestId) return;
                 window.app.initExclusiveGuestPage();
+                await new Promise(resolve => setTimeout(resolve, 220));
+                if (requestId !== activeViewRequestId) return;
+                window.app.hideGuestExperienceLoader();
+            } else if (window.app?.ready) {
+                await window.app.ready;
+                if (requestId !== activeViewRequestId) return;
             }
         } else {
             portal.style.display = 'none';
+            window.app?.hideGuestExperienceLoader();
         }
+        if (resolvedView === 'host') updateCalc();
         window.scrollTo(0, 0);
     }
 
@@ -128,6 +171,55 @@
         const mins = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
         const secs = String(totalSeconds % 60).padStart(2, '0');
         return `${mins}:${secs}`;
+    }
+
+    function hydrateRaffleGuestCount() {
+        const countEl = document.getElementById('guestRaffleCount');
+        if (!countEl) return;
+
+        const storageKey = 'bookily-raffle-guest-count';
+        const now = Date.now();
+        const dayMs = 24 * 60 * 60 * 1000;
+        const minGapMs = 4 * 60 * 60 * 1000;
+        const maxGapMs = 12 * 60 * 60 * 1000;
+
+        let state = {
+            count: 13,
+            lastUpdatedAt: now,
+            nextUpdateAt: now + (6 * 60 * 60 * 1000)
+        };
+
+        try {
+            const raw = localStorage.getItem(storageKey);
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                state.count = Math.max(13, Number(parsed.count) || 13);
+                state.lastUpdatedAt = Number(parsed.lastUpdatedAt) || now;
+                state.nextUpdateAt = Number(parsed.nextUpdateAt) || (state.lastUpdatedAt + (6 * 60 * 60 * 1000));
+            }
+        } catch {}
+
+        if (now - state.lastUpdatedAt > dayMs * 14) {
+            state = {
+                count: 13,
+                lastUpdatedAt: now,
+                nextUpdateAt: now + (6 * 60 * 60 * 1000)
+            };
+        }
+
+        let writes = 0;
+        while (now >= state.nextUpdateAt && writes < 6) {
+            state.count += Math.floor(Math.random() * 5) + 2;
+            state.lastUpdatedAt = state.nextUpdateAt;
+            state.nextUpdateAt += (Math.floor(Math.random() * ((maxGapMs - minGapMs) / (60 * 60 * 1000) + 1)) + 4) * 60 * 60 * 1000;
+            writes++;
+        }
+
+        countEl.innerText = state.count.toLocaleString();
+
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(state));
+        } catch {}
     }
 
     let deferredPwaInstallPrompt = null;
@@ -193,6 +285,8 @@
     window.addEventListener('load', () => {
         registerBookilyServiceWorker();
         setPwaInstallVisibility(false);
+        hydrateRaffleGuestCount();
+        switchView('home');
     });
 
     let tickSound = null;
@@ -373,8 +467,11 @@
             this.exclusiveModalTimerInterval = null;
             this.exclusiveSocialProofInterval = null;
             this.exclusiveLiveWinnersInterval = null;
+            this.exclusivePerksWidgetInterval = null;
+            this.guestLoaderQuoteInterval = null;
             this.exclusiveHasTriggeredExit = false;
             this.exclusiveBookingConfirmed = false;
+            this.exclusiveTimerStateLoaded = false;
             this.exclusiveCurrentSlide = 0;
             this.exclusiveDiscountPhase = 1;
             this.exclusiveDiscountTimeLeft = 35;
@@ -425,6 +522,25 @@
             this.exclusiveToastNames = ["Thomas", "Sarah", "Oluwaseun", "Chioma", "Ahmad", "Nneka", "Eze"];
             this.exclusiveToastLocations = ["Maitama", "Wuse 2", "Asokoro", "Gwarinpa", "Katampe", "Lagos"];
             this.exclusiveToastActions = ["just booked the Penthouse!", "claimed a Free Massage!", "won a Free Night!", "secured 15% Off!", "got 100% Refunded!", "activated Free Protection!"];
+            this.guestLoaderQuotes = [
+                'Every Friday we hold a raffle draw and 10 guests win Free Nights, 100% Refund, 50% off their next booking, Free Lunch, Late Checkout, and more.',
+                'Our guests win free nights when they book.',
+                'Our guests win free lunch when they book.',
+                'You might be lucky too and get 50% off.',
+                'Direct bookings unlock surprise rewards attached instantly to confirmed reservations.',
+                'Some guests walk away with full refunds after booking through the Friday raffle draw.',
+                'Booked stays can unlock free lunch, free nights, late checkout, and comeback discounts.',
+                'The next booking could come with a 50% discount if the raffle lands in your favor.',
+                'Guests who book early stay eligible for the strongest reward drops and timed perks.',
+                'Free nights, refund wins, meal perks, and bonus discounts are built into the Bookily experience.'
+            ];
+            this.guestLoaderTestimonials = [
+                { name: 'Amaka E.', role: 'Weekend guest', text: 'Booked in minutes and still landed a reward on top of the stay.' },
+                { name: 'David T.', role: 'Business traveler', text: 'The apartment was ready, the receipt was instant, and the process felt properly premium.' },
+                { name: 'Zainab O.', role: 'Returning guest', text: 'I won free lunch after booking once and have been coming back since.' },
+                { name: 'Michael A.', role: 'Long-stay guest', text: 'The map view, pricing, and access flow made the booking feel clear from the start.' },
+                { name: 'Chinelo U.', role: 'Holiday guest', text: 'I did not expect the raffle perks to be real until my receipt showed the reward.' }
+            ];
             this.exclusivePerkPrizeDefinitions = [
                 { text: "FREE NIGHT", colors: { start: "#D4AF37", end: "#B8860B" }, detail: "Your entire stay is on us. 100% comped." },
                 { text: "50% OFF", colors: { start: "#D32F2F", end: "#8B0000" }, detail: "We are slashing 50% off your total bill." },
@@ -467,6 +583,7 @@
             this.setupCurrencyFormatting();
             const authFeedback = this.readAuthFeedbackFromUrl();
             this.loadLocalBackupState();
+            this.loadExclusiveTimerState();
             await this.restoreAuthenticatedSession();
             await this.syncFromCloud();
             this.render();
@@ -845,6 +962,131 @@
 
         getLocalBackupKey() {
             return 'bookily-engine-backup';
+        }
+
+        getExclusiveTimerStorageKey() {
+            return 'bookily-engine-exclusive-timer';
+        }
+
+        getExclusiveTimerStateMaxAgeMs() {
+            return 12 * 60 * 60 * 1000;
+        }
+
+        getDefaultExclusiveTimerState() {
+            return {
+                exclusiveDiscountPhase: 1,
+                exclusiveDiscountTimeLeft: 35,
+                exclusiveHeroVipTimeLeft: 225,
+                exclusivePerkDurations: [45, 75, 105, 135, 165, 195, 225],
+                exclusivePerkLost: [false, false, false, false, false, false, false],
+                exclusiveBookingConfirmed: false,
+                savedAt: Date.now()
+            };
+        }
+
+        applyExclusiveTimerState(state) {
+            const fallback = this.getDefaultExclusiveTimerState();
+            this.exclusiveDiscountPhase = state?.exclusiveDiscountPhase ?? fallback.exclusiveDiscountPhase;
+            this.exclusiveDiscountTimeLeft = Math.max(0, state?.exclusiveDiscountTimeLeft ?? fallback.exclusiveDiscountTimeLeft);
+            this.exclusiveHeroVipTimeLeft = Math.max(0, state?.exclusiveHeroVipTimeLeft ?? fallback.exclusiveHeroVipTimeLeft);
+            this.exclusivePerkDurations = (Array.isArray(state?.exclusivePerkDurations) ? state.exclusivePerkDurations : fallback.exclusivePerkDurations)
+                .map(value => Math.max(0, Number(value) || 0))
+                .slice(0, fallback.exclusivePerkDurations.length);
+            while (this.exclusivePerkDurations.length < fallback.exclusivePerkDurations.length) {
+                this.exclusivePerkDurations.push(fallback.exclusivePerkDurations[this.exclusivePerkDurations.length]);
+            }
+            this.exclusivePerkLost = this.exclusivePerkDurations.map((duration, index) => {
+                const explicitLost = Array.isArray(state?.exclusivePerkLost) ? Boolean(state.exclusivePerkLost[index]) : false;
+                return explicitLost || duration <= 0;
+            });
+            this.exclusiveBookingConfirmed = Boolean(state?.exclusiveBookingConfirmed);
+            this.exclusiveModalTimeLeft = Math.max(...this.exclusivePerkDurations);
+        }
+
+        rehydrateExclusiveTimerState(snapshot) {
+            const base = {
+                ...this.getDefaultExclusiveTimerState(),
+                ...(snapshot || {})
+            };
+            const savedAt = Number(base.savedAt) || Date.now();
+            let elapsed = Math.max(0, Math.floor((Date.now() - savedAt) / 1000));
+
+            base.exclusiveHeroVipTimeLeft = Math.max(0, (Number(base.exclusiveHeroVipTimeLeft) || 0) - elapsed);
+            base.exclusivePerkDurations = (Array.isArray(base.exclusivePerkDurations) ? base.exclusivePerkDurations : [])
+                .map(value => Math.max(0, (Number(value) || 0) - elapsed));
+
+            let phase = Number(base.exclusiveDiscountPhase) || 1;
+            let timeLeft = Math.max(0, Number(base.exclusiveDiscountTimeLeft) || 0);
+            while (elapsed > 0 && phase < 3) {
+                if (timeLeft > elapsed) {
+                    timeLeft -= elapsed;
+                    elapsed = 0;
+                } else {
+                    elapsed -= timeLeft;
+                    if (phase === 1) {
+                        phase = 2;
+                        timeLeft = 13;
+                    } else {
+                        phase = 3;
+                        timeLeft = 0;
+                    }
+                }
+            }
+            if (phase >= 3) {
+                phase = 3;
+                timeLeft = 0;
+            }
+
+            return {
+                exclusiveDiscountPhase: phase,
+                exclusiveDiscountTimeLeft: timeLeft,
+                exclusiveHeroVipTimeLeft: base.exclusiveHeroVipTimeLeft,
+                exclusivePerkDurations: base.exclusivePerkDurations,
+                exclusivePerkLost: base.exclusivePerkDurations.map(duration => duration <= 0),
+                exclusiveBookingConfirmed: Boolean(base.exclusiveBookingConfirmed),
+                savedAt: Date.now()
+            };
+        }
+
+        saveExclusiveTimerState() {
+            try {
+                const snapshot = {
+                    exclusiveDiscountPhase: this.exclusiveDiscountPhase,
+                    exclusiveDiscountTimeLeft: this.exclusiveDiscountTimeLeft,
+                    exclusiveHeroVipTimeLeft: this.exclusiveHeroVipTimeLeft,
+                    exclusivePerkDurations: [...this.exclusivePerkDurations],
+                    exclusivePerkLost: [...this.exclusivePerkLost],
+                    exclusiveBookingConfirmed: this.exclusiveBookingConfirmed,
+                    savedAt: Date.now()
+                };
+                localStorage.setItem(this.getExclusiveTimerStorageKey(), JSON.stringify(snapshot));
+                this.exclusiveTimerStateLoaded = true;
+            } catch (error) {
+                console.warn('Exclusive timer state save failed:', error);
+            }
+        }
+
+        loadExclusiveTimerState() {
+            try {
+                const raw = localStorage.getItem(this.getExclusiveTimerStorageKey());
+                if (!raw) return;
+                const snapshot = JSON.parse(raw);
+                const savedAt = Number(snapshot?.savedAt) || 0;
+                if (!savedAt || (Date.now() - savedAt) > this.getExclusiveTimerStateMaxAgeMs()) {
+                    localStorage.removeItem(this.getExclusiveTimerStorageKey());
+                    return;
+                }
+                this.applyExclusiveTimerState(this.rehydrateExclusiveTimerState(snapshot));
+                this.exclusiveTimerStateLoaded = true;
+            } catch (error) {
+                console.warn('Exclusive timer state load failed:', error);
+            }
+        }
+
+        ensureExclusiveTimerState() {
+            if (this.exclusiveTimerStateLoaded) return;
+            this.applyExclusiveTimerState(this.getDefaultExclusiveTimerState());
+            this.saveExclusiveTimerState();
         }
 
         mergeRecordsByKey(primary, fallback, keyField = 'id') {
@@ -1486,20 +1728,8 @@
                     }));
                 }
 
-                this.transactions = bookingRows.map(row => ({
-                    id: row.id,
-                    date: row.booking_date,
-                    propId: row.property_id,
-                    amount: Number(row.amount_paid) || 0,
-                    estimatedTotal: Number(row.estimated_total) || 0,
-                    cautionFee: Number(row.caution_fee_paid) || 0,
-                    guest: row.guest_name,
-                    phone: row.guest_phone,
-                    email: row.guest_email || '',
-                    accessCode: row.access_code || '',
-                    checkIn: row.check_in || '',
-                    checkOut: row.check_out || ''
-                }));
+                const propertyLookup = new Map(this.inventory.map(item => [item.id, item]));
+                this.transactions = bookingRows.map(row => this.mapBookingRowToTransaction(row, propertyLookup));
 
                 this.expenditures = expenditureRows.map(row => ({
                     id: row.id,
@@ -1624,7 +1854,7 @@
 
             const { error } = await this.supabase
                 .from('bookings')
-                .insert(this.mapBookingToRow(transaction));
+                .upsert(this.mapBookingToRow(transaction), { onConflict: 'id' });
 
             if (error) {
                 console.warn('Guest booking sync failed:', error);
@@ -1634,6 +1864,46 @@
 
             this.updateSyncUI('online');
             return true;
+        }
+
+        async fetchGuestBookingsByAccess(phone, accessCode) {
+            if (!this.supabase) return [];
+
+            const { data: bookingRows, error } = await this.supabase
+                .from('bookings')
+                .select('*')
+                .eq('guest_phone', phone)
+                .eq('access_code', accessCode)
+                .order('booking_date', { ascending: false });
+
+            if (error) {
+                console.warn('Guest booking lookup failed:', error);
+                this.updateSyncUI('offline');
+                return [];
+            }
+
+            const propertyIds = [...new Set((bookingRows || []).map(row => row.property_id).filter(Boolean))];
+            const propertyLookup = new Map(this.inventory.map(item => [item.id, item]));
+
+            if (propertyIds.length) {
+                const { data: propertyRows, error: propertyError } = await this.supabase
+                    .from('properties')
+                    .select('id, property_name, location')
+                    .in('id', propertyIds);
+
+                if (!propertyError && Array.isArray(propertyRows)) {
+                    propertyRows.forEach(row => {
+                        propertyLookup.set(row.id, {
+                            id: row.id,
+                            name: row.property_name,
+                            loc: row.location
+                        });
+                    });
+                }
+            }
+
+            this.updateSyncUI('online');
+            return (bookingRows || []).map(row => this.mapBookingRowToTransaction(row, propertyLookup));
         }
 
         async performSupabaseSync() {
@@ -3376,8 +3646,8 @@
             return {
                 receiptNumber: tx.id || this.getTransactionId(tx),
                 guest: tx.guest,
-                property: prop?.name || tx.propId,
-                location: prop?.loc || '',
+                property: tx.propertyName || prop?.name || tx.propId,
+                location: tx.propertyLocation || prop?.loc || '',
                 checkIn: tx.checkIn || '',
                 checkOut: tx.checkOut || '',
                 total: estimatedTotal,
@@ -3389,6 +3659,27 @@
                 email: tx.email || '',
                 date: tx.date || '',
                 reward: tx.reward || null
+            };
+        }
+
+        mapBookingRowToTransaction(row, propertyLookup = new Map()) {
+            const property = propertyLookup.get(row.property_id) || null;
+            return {
+                id: row.id,
+                date: row.booking_date,
+                propId: row.property_id,
+                propertyName: row.property_name || property?.name || '',
+                propertyLocation: row.property_location || property?.loc || '',
+                amount: Number(row.amount_paid) || 0,
+                estimatedTotal: Number(row.estimated_total) || 0,
+                cautionFee: Number(row.caution_fee_paid) || 0,
+                guest: row.guest_name,
+                phone: row.guest_phone,
+                email: row.guest_email || '',
+                accessCode: row.access_code || '',
+                checkIn: row.check_in || '',
+                checkOut: row.check_out || '',
+                reward: row.reward ? { label: row.reward, detail: row.reward_detail || '' } : null
             };
         }
 
@@ -3824,17 +4115,69 @@
         }
 
         initExclusiveGuestPage() {
+            this.ensureExclusiveTimerState();
             this.updateExclusiveHeroText(this.exclusiveCurrentSlide);
             this.restartExclusiveHeroSlider();
             this.restartExclusiveMasterTimer();
             this.restartExclusiveSocialProof();
             this.restartExclusiveWinnersTicker();
+            this.restartExclusivePerksWidgetMotion();
             this.ensureExclusiveExitIntent();
             this.ensureExclusiveSpinBindings();
             this.populateExclusiveFilterOptions();
             this.syncExclusiveControls();
             this.renderExclusiveListings();
             this.resizeExclusiveCanvas();
+        }
+
+        showGuestExperienceLoader() {
+            const loader = document.getElementById('guestExperienceLoader');
+            if (!loader) return;
+            loader.classList.add('show');
+            this.renderGuestLoaderState(0);
+            if (this.guestLoaderQuoteInterval) clearInterval(this.guestLoaderQuoteInterval);
+            let quoteIndex = 0;
+            this.guestLoaderQuoteInterval = setInterval(() => {
+                quoteIndex = (quoteIndex + 1) % this.guestLoaderQuotes.length;
+                this.renderGuestLoaderState(quoteIndex);
+            }, 2600);
+        }
+
+        hideGuestExperienceLoader() {
+            const loader = document.getElementById('guestExperienceLoader');
+            if (loader) loader.classList.remove('show');
+            if (this.guestLoaderQuoteInterval) clearInterval(this.guestLoaderQuoteInterval);
+            this.guestLoaderQuoteInterval = null;
+        }
+
+        renderGuestLoaderState(quoteIndex = 0) {
+            const quoteEl = document.getElementById('guestLoaderQuote');
+            const testimonialsEl = document.getElementById('guestLoaderTestimonials');
+            if (quoteEl) quoteEl.innerText = this.guestLoaderQuotes[quoteIndex % this.guestLoaderQuotes.length];
+            if (!testimonialsEl) return;
+
+            const cards = Array.from({ length: 3 }, (_, index) => {
+                const item = this.guestLoaderTestimonials[(quoteIndex + index) % this.guestLoaderTestimonials.length];
+                return `
+                    <article class="guest-loader-testimonial-card">
+                        <p>${item.text}</p>
+                        <strong>${item.name}</strong>
+                        <span>${item.role}</span>
+                    </article>
+                `;
+            });
+
+            testimonialsEl.innerHTML = cards.join('');
+        }
+
+        restartExclusivePerksWidgetMotion() {
+            const widget = document.getElementById('guestExclusivePerksWidget');
+            if (!widget) return;
+            widget.classList.add('is-visible');
+            if (this.exclusivePerksWidgetInterval) clearInterval(this.exclusivePerksWidgetInterval);
+            this.exclusivePerksWidgetInterval = setInterval(() => {
+                widget.classList.toggle('is-visible');
+            }, 8000);
         }
 
         populateExclusiveFilterOptions() {
@@ -3847,9 +4190,9 @@
                 select.value = items.includes(current) ? current : 'all';
             };
 
-            fillSelect('guestExclusiveLocationFilter', [...new Set(available.map(item => item.loc).filter(Boolean))].sort(), 'All Locations');
-            fillSelect('guestExclusiveCityFilter', [...new Set(available.map(item => this.getPropertyCity(item)).filter(Boolean))].sort(), 'All Cities');
-            fillSelect('guestExclusiveStateFilter', [...new Set(available.map(item => this.getPropertyState(item)).filter(Boolean))].sort(), 'All States');
+            fillSelect('guestExclusiveLocationFilter', [...new Set(available.map(item => item.loc).filter(Boolean))].sort(), 'Location');
+            fillSelect('guestExclusiveCityFilter', [...new Set(available.map(item => this.getPropertyCity(item)).filter(Boolean))].sort(), 'City');
+            fillSelect('guestExclusiveStateFilter', [...new Set(available.map(item => this.getPropertyState(item)).filter(Boolean))].sort(), 'State');
         }
 
         syncExclusiveControls() {
@@ -4090,11 +4433,27 @@
             }
             this.exclusiveGuestMapMarkers = [];
 
+            const locationCounts = new Map();
             const validCoords = data.filter(prop => prop.coords && !isNaN(parseFloat(prop.coords.lat)) && !isNaN(parseFloat(prop.coords.lng)));
             validCoords.forEach(prop => {
-                const lat = parseFloat(prop.coords.lat);
-                const lng = parseFloat(prop.coords.lng);
-                const marker = L.marker([lat, lng]).addTo(this.exclusiveGuestMapInstance);
+                const baseLat = parseFloat(prop.coords.lat);
+                const baseLng = parseFloat(prop.coords.lng);
+                const coordKey = `${baseLat.toFixed(5)}:${baseLng.toFixed(5)}`;
+                const overlapIndex = locationCounts.get(coordKey) || 0;
+                locationCounts.set(coordKey, overlapIndex + 1);
+                const angle = overlapIndex * 0.95;
+                const offset = overlapIndex * 0.00045;
+                const lat = baseLat + (overlapIndex ? Math.sin(angle) * offset : 0);
+                const lng = baseLng + (overlapIndex ? Math.cos(angle) * offset : 0);
+                const marker = L.marker([lat, lng], {
+                    icon: L.divIcon({
+                        className: 'guest-map-price-marker-wrap',
+                        html: `<div class="guest-map-price-marker">${this.formatCurrency(prop.price)}</div>`,
+                        iconSize: [96, 34],
+                        iconAnchor: [48, 17],
+                        popupAnchor: [0, -12]
+                    })
+                }).addTo(this.exclusiveGuestMapInstance);
                 marker.bindPopup(`
                     <div style="min-width:180px;">
                         <strong style="display:block; margin-bottom:6px; font-size:1rem;">${prop.name}</strong>
@@ -4229,26 +4588,48 @@
             const banner = document.getElementById('guestExclusiveTopBanner');
             if (!discountEl || !heroVipEl || !bannerText || !banner) return;
 
-            this.exclusiveDiscountPhase = 1;
-            this.exclusiveDiscountTimeLeft = 35;
-            this.exclusiveHeroVipTimeLeft = 225;
-            this.exclusivePerkDurations = [45, 75, 105, 135, 165, 195, 225];
-            this.exclusivePerkLost = [false, false, false, false, false, false, false];
-            this.exclusiveBookingConfirmed = false;
+            this.ensureExclusiveTimerState();
             discountEl.style.display = '';
             discountEl.classList.remove('text-gray-900');
             discountEl.classList.add('text-amada-red');
             banner.classList.add('urgency-banner-red', 'border-red-900');
             banner.classList.remove('bg-gray-900', 'bg-black');
-            bannerText.innerHTML = 'FLASH SALE: Claim 50% OFF your stay. Price jumps in:';
-            discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
+            if (this.exclusiveDiscountPhase === 1) {
+                bannerText.innerHTML = 'FLASH SALE: Claim 50% OFF your stay. Price jumps in:';
+                discountEl.style.display = '';
+                discountEl.classList.remove('text-gray-900');
+                discountEl.classList.add('text-amada-red');
+                banner.classList.add('urgency-banner-red', 'border-red-900');
+                banner.classList.remove('bg-gray-900', 'bg-black');
+                discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
+            } else if (this.exclusiveDiscountPhase === 2) {
+                bannerText.innerHTML = "CHALLENGE FAILED. <span class='text-red-200'>New Offer:</span> Claim 15% OFF in:";
+                discountEl.style.display = '';
+                banner.classList.remove('urgency-banner-red', 'border-red-900');
+                banner.classList.add('bg-gray-900');
+                discountEl.classList.remove('text-amada-red');
+                discountEl.classList.add('text-gray-900');
+                discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
+            } else {
+                bannerText.innerHTML = 'OFFERS EXPIRED. Standard rates apply.';
+                discountEl.style.display = 'none';
+                banner.classList.remove('urgency-banner-red', 'border-red-900', 'bg-gray-900');
+                banner.classList.add('bg-black');
+            }
             heroVipEl.innerText = this.formatExclusiveTime(this.exclusiveHeroVipTimeLeft);
-            heroVipEl.classList.remove('text-gray-400');
-            heroVipEl.classList.add('text-amada-red');
-            heroVipEl.parentElement?.parentElement?.classList.remove('opacity-50');
+            if (this.exclusiveHeroVipTimeLeft > 0) {
+                heroVipEl.classList.remove('text-gray-400');
+                heroVipEl.classList.add('text-amada-red');
+                heroVipEl.parentElement?.parentElement?.classList.remove('opacity-50');
+            } else {
+                heroVipEl.classList.remove('text-amada-red');
+                heroVipEl.classList.add('text-gray-400');
+                heroVipEl.parentElement?.parentElement?.classList.add('opacity-50');
+            }
             this.updateExclusivePerkHighlights();
             this.updateExclusiveDynamicTexts();
             this.prepareExclusiveSpinPrizes();
+            this.saveExclusiveTimerState();
 
             if (this.exclusiveMasterTimerInterval) clearInterval(this.exclusiveMasterTimerInterval);
             this.exclusiveMasterTimerInterval = setInterval(() => {
@@ -4301,6 +4682,8 @@
                 if (modalCountdown) {
                     modalCountdown.innerText = maxTimeLeft > 0 ? this.formatExclusiveTime(maxTimeLeft) : 'EXPIRED';
                 }
+
+                this.saveExclusiveTimerState();
             }, 1000);
         }
 
@@ -4343,7 +4726,11 @@
             let activeFound = false;
             for (let i = 0; i < this.exclusivePerkLost.length; i++) {
                 const perkEl = document.getElementById(`guestExclusivePerk${i + 1}`);
-                if (!perkEl || this.exclusivePerkLost[i]) continue;
+                if (!perkEl) continue;
+                if (this.exclusivePerkLost[i]) {
+                    this.crossOutExclusivePerk(i);
+                    continue;
+                }
                 perkEl.classList.remove('border-green-500', 'shadow-[0_0_12px_rgba(34,197,94,0.4)]', 'scale-[1.02]', 'border-green-100', 'scale-100');
                 if (!activeFound) {
                     perkEl.classList.add('border-green-500', 'shadow-[0_0_12px_rgba(34,197,94,0.4)]', 'scale-[1.02]');
@@ -4687,6 +5074,9 @@
             }
 
             const doorCode = await this.generateLockCode();
+            const previousStatus = property.status;
+            const previousGuestName = property.guestName;
+            const previousAccessCode = property.accessCode;
             property.status = 'occupied';
             property.guestName = name;
             property.accessCode = doorCode;
@@ -4702,16 +5092,28 @@
                 email,
                 accessCode: doorCode,
                 checkIn,
-                checkOut
+                checkOut,
+                propertyName: property.name,
+                propertyLocation: property.loc
             };
-            this.transactions.push(transaction);
+            const cloudSaved = await this.saveGuestBookingToCloud(transaction).catch(() => false);
+            if (!cloudSaved) {
+                property.status = previousStatus;
+                property.guestName = previousGuestName;
+                property.accessCode = previousAccessCode;
+                if (button) {
+                    button.innerHTML = originalText || 'Proceed To Secure Payment';
+                    button.disabled = false;
+                }
+                this.showNotification('Booking could not be confirmed right now. Please try again.', 'error');
+                return;
+            }
+
+            this.transactions = [transaction, ...this.transactions.filter(item => item.id !== transaction.id)];
             this.exclusivePendingTransactionId = transaction.id;
             this.exclusiveBookingConfirmed = true;
+            this.saveExclusiveTimerState();
             this.saveLocalData();
-            const authUser = await this.getAuthenticatedUser().catch(() => null);
-            if (!authUser) {
-                await this.saveGuestBookingToCloud(transaction).catch(() => null);
-            }
             this.prepareExclusiveSpinPrizes();
             this.closeExclusiveBookingModal();
             if (button) {
@@ -5299,20 +5701,34 @@
             }).join('');
         }
 
-        lookupExclusiveReservations() {
-            const phone = document.getElementById('guestExclusiveLookupPhone')?.value.trim();
-            const pin = document.getElementById('guestExclusiveLookupPin')?.value.trim();
-            const target = document.getElementById('guestExclusiveReservationsArea');
+        async lookupGuestAccessReservations() {
+            const phone = document.getElementById('guestAccessPhone')?.value.trim();
+            const accessCode = document.getElementById('guestAccessCode')?.value.trim();
+            const target = document.getElementById('guestAccessReservationsArea');
             if (!target) return;
 
-            if (!phone || !pin) {
-                target.innerHTML = `<div class="text-gray-500 font-medium">Enter your phone number and booking PIN to continue.</div>`;
+            if (!phone || !accessCode) {
+                target.innerHTML = `<div class="text-gray-500 font-medium">Enter your phone number and access code to continue.</div>`;
                 return;
             }
 
-            const matches = this.transactions.filter(tx => tx.phone === phone && tx.accessCode === pin);
+            target.innerHTML = `<div class="text-gray-500 font-medium">Checking your reservation...</div>`;
+            const remoteMatches = await this.fetchGuestBookingsByAccess(phone, accessCode);
+            const localMatches = this.transactions.filter(tx => tx.phone === phone && tx.accessCode === accessCode);
+            const matches = remoteMatches.length ? remoteMatches : localMatches;
+
+            if (remoteMatches.length) {
+                const merged = new Map(this.transactions.map(tx => [tx.id || this.getTransactionId(tx), tx]));
+                remoteMatches.forEach(tx => {
+                    const key = tx.id || this.getTransactionId(tx);
+                    merged.set(key, { ...merged.get(key), ...tx });
+                });
+                this.transactions = Array.from(merged.values());
+                this.saveLocalBackupState();
+            }
+
             if (!matches.length) {
-                target.innerHTML = `<div class="text-gray-500 font-medium">No reservations matched that phone number and PIN.</div>`;
+                target.innerHTML = `<div class="text-gray-500 font-medium">No reservations matched that phone number and access code.</div>`;
                 return;
             }
 
@@ -5334,7 +5750,7 @@
                             </div>
                             <div class="text-left md:text-right">
                                 <div class="font-black text-2xl text-amada-red">${this.formatCurrency(receipt.total)}</div>
-                                <div class="text-sm text-gray-500 mt-2">PIN: ${receipt.code}</div>
+                                <div class="text-sm text-gray-500 mt-2">Access Code: ${receipt.code}</div>
                             </div>
                         </div>
                         <div class="flex justify-between items-center gap-4 mt-6 flex-wrap">
@@ -5349,6 +5765,10 @@
                     </div>
                 `;
             }).join('');
+        }
+
+        lookupExclusiveReservations() {
+            return this.lookupGuestAccessReservations();
         }
         
         renderExpenditureTab() {
