@@ -433,6 +433,8 @@
             this.salaryRegistry = [];
             this.rentRegistry = [];
             this.otherIncome = [];
+            this.vatPercentage = 12.5;
+            this.maintenancePercentage = 5;
             
             this.hosts = [];
             this.teamMembers = [];
@@ -756,6 +758,16 @@
         setCurrencyInputValue(id, value) {
             const input = document.getElementById(id);
             if (input) input.value = this.formatCurrencyInputValue(value);
+        }
+
+        normalizePercentageValue(value, fallback = 0) {
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 0) return fallback;
+            return Math.round(parsed * 100) / 100;
+        }
+
+        isExecutiveDashboardActive() {
+            return this.role === 'chairman' || (this.role === 'host' && this.hostDashboardRole === 'chairman');
         }
 
         setupCurrencyFormatting() {
@@ -1106,12 +1118,14 @@
                     inventory: this.inventory,
                     transactions: this.transactions,
                     expenditures: this.expenditures,
-                    refunds: this.refunds,
-                    salaryRegistry: this.salaryRegistry,
-                    rentRegistry: this.rentRegistry,
-                    otherIncome: this.otherIncome,
-                    checkedExpenseIds: Array.from(this.checkedExpenseIds || [])
-                };
+                refunds: this.refunds,
+                salaryRegistry: this.salaryRegistry,
+                rentRegistry: this.rentRegistry,
+                otherIncome: this.otherIncome,
+                vatPercentage: this.vatPercentage,
+                maintenancePercentage: this.maintenancePercentage,
+                checkedExpenseIds: Array.from(this.checkedExpenseIds || [])
+            };
                 localStorage.setItem(this.getLocalBackupKey(), JSON.stringify(payload));
             } catch (error) {
                 console.warn('Local backup save failed:', error);
@@ -1130,6 +1144,8 @@
                 this.salaryRegistry = Array.isArray(payload.salaryRegistry) ? payload.salaryRegistry : this.salaryRegistry;
                 this.rentRegistry = Array.isArray(payload.rentRegistry) ? payload.rentRegistry : this.rentRegistry;
                 this.otherIncome = Array.isArray(payload.otherIncome) ? payload.otherIncome : this.otherIncome;
+                this.vatPercentage = this.normalizePercentageValue(payload.vatPercentage, this.vatPercentage);
+                this.maintenancePercentage = this.normalizePercentageValue(payload.maintenancePercentage, this.maintenancePercentage);
                 this.checkedExpenseIds = new Set(Array.isArray(payload.checkedExpenseIds) ? payload.checkedExpenseIds : []);
             } catch (error) {
                 console.warn('Local backup load failed:', error);
@@ -1147,6 +1163,8 @@
                 this.salaryRegistry = this.mergeRecordsByKey(this.salaryRegistry, payload.salaryRegistry || [], 'id');
                 this.rentRegistry = this.mergeRecordsByKey(this.rentRegistry, payload.rentRegistry || [], 'id');
                 this.otherIncome = this.mergeRecordsByKey(this.otherIncome, payload.otherIncome || [], 'id');
+                this.vatPercentage = this.normalizePercentageValue(payload.vatPercentage, this.vatPercentage);
+                this.maintenancePercentage = this.normalizePercentageValue(payload.maintenancePercentage, this.maintenancePercentage);
                 const backupChecked = Array.isArray(payload.checkedExpenseIds) ? payload.checkedExpenseIds : [];
                 this.checkedExpenseIds = new Set([...(this.checkedExpenseIds || []), ...backupChecked]);
             } catch (error) {
@@ -6185,8 +6203,10 @@
             const refunds = this.getFilteredRefunds(from, to, location)
                 .reduce((sum, refund) => sum + (refund.amount || 0), 0);
             const netRevenue = grossRevenue - refunds;
-            const vat = netRevenue > 0 ? netRevenue * 0.125 : 0;
-            const maintenance = netRevenue > 0 ? netRevenue * 0.05 : 0;
+            const vatRate = this.normalizePercentageValue(this.vatPercentage, 12.5) / 100;
+            const maintenanceRate = this.normalizePercentageValue(this.maintenancePercentage, 5) / 100;
+            const vat = netRevenue > 0 ? netRevenue * vatRate : 0;
+            const maintenance = netRevenue > 0 ? netRevenue * maintenanceRate : 0;
             const approvedExpenses = exps
                 .filter(exp => this.isExecutiveApprovedStatus(exp.status))
                 .reduce((sum, exp) => sum + (exp.amount || 0), 0);
@@ -6204,7 +6224,9 @@
                 grossRevenue,
                 refunds,
                 netRevenue,
+                vatRate,
                 vat,
+                maintenanceRate,
                 maintenance,
                 recordedExpenses: approvedExpenses,
                 operatingProfit,
@@ -6404,6 +6426,11 @@
         }
 
         upsertRentEntry() {
+            if (!this.isExecutiveDashboardActive()) {
+                this.showNotification("Only executive access can update rent registry.", "error");
+                return;
+            }
+
             const editingLocation = document.getElementById('rentEditLocation').value || document.getElementById('rentLocation').value;
             const location = document.getElementById('rentLocation').value;
             const amount = this.parseCurrencyValue(document.getElementById('rentAmount').value);
@@ -6426,6 +6453,28 @@
             this.currentRentEditLocation = null;
             this.showNotification("Rent record updated.", "success");
             this.render();
+        }
+
+        saveExecutiveFinanceSettings() {
+            if (!this.isExecutiveDashboardActive()) {
+                this.showNotification("Only executive access can update finance settings.", "error");
+                return;
+            }
+
+            const vatInput = document.getElementById('executiveVatPercentage');
+            const maintenanceInput = document.getElementById('executiveMaintenancePercentage');
+            const nextVat = this.normalizePercentageValue(vatInput?.value, NaN);
+            const nextMaintenance = this.normalizePercentageValue(maintenanceInput?.value, NaN);
+
+            if (!Number.isFinite(nextVat) || !Number.isFinite(nextMaintenance)) {
+                this.showNotification("Enter valid VAT and maintenance percentages.", "error");
+                return;
+            }
+
+            this.vatPercentage = nextVat;
+            this.maintenancePercentage = nextMaintenance;
+            this.saveLocalData();
+            this.showNotification("Executive finance settings updated.", "success");
         }
 
         startEditRentEntry(location) {
@@ -6785,7 +6834,7 @@
                     <div class="mgmt-tabs">
                         <div class="mgmt-tab ${this.activeMgmtTab === 'pl' ? 'active' : ''}" onclick="app.setManagementTab('pl')"><i class="fa-solid fa-file-invoice-dollar"></i> P&L Statement</div>
                         <div class="mgmt-tab ${this.activeMgmtTab === 'ops' ? 'active' : ''}" onclick="app.setManagementTab('ops')"><i class="fa-solid fa-receipt"></i> Operations Recording</div>
-                        <div class="mgmt-tab ${this.activeMgmtTab === 'payroll' ? 'active' : ''}" onclick="app.setManagementTab('payroll')"><i class="fa-solid fa-users-gear"></i> Salaries & Rent</div>
+                        <div class="mgmt-tab ${this.activeMgmtTab === 'payroll' ? 'active' : ''}" onclick="app.setManagementTab('payroll')"><i class="fa-solid fa-users-gear"></i> Salaries</div>
                         <div class="mgmt-tab ${this.activeMgmtTab === 'refunds' ? 'active' : ''}" onclick="app.setManagementTab('refunds')"><i class="fa-solid fa-rotate-left"></i> Refunds</div>
                         <div class="mgmt-tab ${this.activeMgmtTab === 'properties' ? 'active' : ''}" onclick="app.setManagementTab('properties')"><i class="fa-solid fa-building"></i> Property Control</div>
                     </div>
@@ -6817,8 +6866,8 @@
                                     <div style="display:flex; justify-content:space-between; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.12);"><span style="font-weight:700;">Gross Revenue</span><strong>${this.formatCurrency(metrics.grossRevenue)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Refunds</span><strong>-${this.formatCurrency(metrics.refunds).replace('₦', '₦')}</strong></div>
                                     <div style="display:flex; justify-content:space-between; padding:14px 0; border-top:1px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.12);"><span style="font-weight:700;">Net Revenue</span><strong>${this.formatCurrency(metrics.netRevenue)}</strong></div>
-                                    <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: VAT (12.5%)</span><strong>-${this.formatCurrency(metrics.vat)}</strong></div>
-                                    <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Maint (5%)</span><strong>-${this.formatCurrency(metrics.maintenance)}</strong></div>
+                                    <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: VAT (${this.vatPercentage}%)</span><strong>-${this.formatCurrency(metrics.vat)}</strong></div>
+                                    <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Maint (${this.maintenancePercentage}%)</span><strong>-${this.formatCurrency(metrics.maintenance)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Rent (Allocated)</span><strong>-${this.formatCurrency(metrics.baselines.rent)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Total Sundry</span><strong>-${this.formatCurrency(metrics.recordedExpenses)}</strong></div>
                                     <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Salaries</span><strong>-${this.formatCurrency(metrics.baselines.salary)}</strong></div>
@@ -6950,12 +6999,11 @@
                     ` : this.activeMgmtTab === 'payroll' ? `
                         ${(() => {
                             const editingSalary = this.salaryRegistry.find(entry => entry.id === this.currentSalaryEditId);
-                            const editingRent = this.rentRegistry.find(entry => entry.location === this.currentRentEditLocation);
                             const presetRole = editingSalary && ['Housekeeper', 'Manager', 'Supervisor', 'Chef', 'Driver', 'Laundry', 'Security', 'Other'].includes(editingSalary.role) ? editingSalary.role : editingSalary ? 'Other' : 'Housekeeper';
                             const presetOtherRole = editingSalary && !['Housekeeper', 'Manager', 'Supervisor', 'Chef', 'Driver', 'Laundry', 'Security'].includes(editingSalary.role) ? editingSalary.role : '';
                             const salaryPropertyOptions = this.getScopedInventoryRecords();
                             return `
-                        <div style="display:grid; grid-template-columns:minmax(320px, 1fr) minmax(320px, 1fr); gap:24px;">
+                        <div style="display:grid; grid-template-columns:minmax(320px, 1fr); gap:24px;">
                             <div class="panel">
                                 <h3 style="margin-top:0;"><i class="fa-solid fa-user-tie" style="color:var(--primary)"></i> Staff Salary Registry</h3>
                                 <form id="salaryForm" onsubmit="event.preventDefault(); app.addSalaryEntry();" style="margin-top:20px;">
@@ -7005,28 +7053,6 @@
                                     <div style="font-size:2rem; font-weight:700;">${this.formatCurrency(metrics.baselines.salary)}</div>
                                 </div>
                             </div>
-                            <div class="panel">
-                                <h3 style="margin-top:0;"><i class="fa-solid fa-building-circle-check" style="color:var(--primary)"></i> Rent Registry</h3>
-                                <form id="rentForm" onsubmit="event.preventDefault(); app.upsertRentEntry();" style="margin-top:20px;">
-                                    <input type="hidden" id="rentEditLocation" value="${editingRent?.location || ''}">
-                                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
-                                        <div class="input-floating">
-                                            <select id="rentLocation" required>
-                                                ${locations.map(loc => `<option value="${loc}" ${editingRent?.location === loc ? 'selected' : ''}>${loc}</option>`).join('')}
-                                            </select>
-                                            <label style="top:5px; font-size:0.7rem;">Location</label>
-                                        </div>
-                                        <div class="input-floating"><input type="text" id="rentAmount" value="${this.formatCurrencyInputValue(editingRent?.amount || '')}" data-currency inputmode="numeric" autocomplete="off" required><label>Annual Rent (₦)</label></div>
-                                    </div>
-                                    <button class="btn-primary" style="margin-top:10px; justify-content:center;">
-                                        <i class="fa-solid fa-cloud-arrow-up"></i> ${editingRent ? 'Update Annual Rent' : 'Save Annual Rent'}
-                                    </button>
-                                </form>
-                                <div style="margin-top:20px; border-top:1px solid #eee; padding-top:16px;">
-                                    <div style="font-size:0.9rem; color:var(--gray); margin-bottom:12px;">Allocated Rent For Selected Period</div>
-                                    <div style="font-size:2rem; font-weight:700;">${this.formatCurrency(metrics.baselines.rent)}</div>
-                                </div>
-                            </div>
                         </div>
                         <div class="panel">
                             <h3 style="margin-top:0;">Salary Ledger</h3>
@@ -7042,18 +7068,6 @@
                                         <strong>${this.formatCurrency(entry.amount)}</strong>
                                         <button class="btn-outline" onclick="app.startEditSalaryEntry('${entry.id}')"><i class="fa-solid fa-pen"></i></button>
                                         <button class="btn-outline" onclick="app.removeSalaryEntry('${entry.id}')" style="border-color:var(--danger); color:var(--danger);"><i class="fa-solid fa-trash"></i></button>
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        <div class="panel">
-                            <h3 style="margin-top:0;">Rent Ledger</h3>
-                            ${this.rentRegistry.length === 0 ? `<div style="padding:24px 0; color:var(--gray);">No rent entries added yet.</div>` : this.rentRegistry.map(entry => `
-                                <div style="display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #eee;">
-                                    <div style="font-weight:600;">${entry.location}</div>
-                                    <div style="display:flex; gap:12px; align-items:center;">
-                                        <strong>${this.formatCurrency(entry.amount)} / year</strong>
-                                        <button class="btn-outline" onclick="app.startEditRentEntry('${entry.location}')"><i class="fa-solid fa-pen"></i></button>
                                     </div>
                                 </div>
                             `).join('')}
@@ -7101,6 +7115,7 @@
         renderChairmanDashboard(container) {
             const metrics = this.getExecutiveMetrics(this.chairmanDateFrom, this.chairmanDateTo, this.chairmanLocation);
             const locations = this.getAvailableLocations();
+            const editingRent = this.rentRegistry.find(entry => entry.location === this.currentRentEditLocation);
             const chairmanExpenses = this.getFilteredExpenditures(this.chairmanDateFrom, this.chairmanDateTo, this.chairmanLocation)
                 .filter(exp => this.isExecutiveApprovedStatus(exp.status))
                 .sort((a, b) => (b.approvedAt || b.date || '').localeCompare(a.approvedAt || a.date || ''))
@@ -7172,12 +7187,60 @@
                             <div style="display:flex; justify-content:space-between; padding-bottom:14px; border-bottom:1px solid rgba(255,255,255,0.12);"><span style="font-weight:700;">Gross Revenue</span><strong>${this.formatCurrency(metrics.grossRevenue)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Refunds</span><strong>-${this.formatCurrency(metrics.refunds).replace('₦', '₦')}</strong></div>
                             <div style="display:flex; justify-content:space-between; padding:14px 0; border-top:1px solid rgba(255,255,255,0.12); border-bottom:1px solid rgba(255,255,255,0.12);"><span style="font-weight:700;">Net Revenue</span><strong>${this.formatCurrency(metrics.netRevenue)}</strong></div>
-                            <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: VAT (12.5%)</span><strong>-${this.formatCurrency(metrics.vat)}</strong></div>
-                            <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Maint (5%)</span><strong>-${this.formatCurrency(metrics.maintenance)}</strong></div>
+                            <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: VAT (${this.vatPercentage}%)</span><strong>-${this.formatCurrency(metrics.vat)}</strong></div>
+                            <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Maint (${this.maintenancePercentage}%)</span><strong>-${this.formatCurrency(metrics.maintenance)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Rent (Allocated)</span><strong>-${this.formatCurrency(metrics.baselines.rent)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Total Sundry</span><strong>-${this.formatCurrency(metrics.recordedExpenses)}</strong></div>
                             <div style="display:flex; justify-content:space-between; color:#ff9f9f;"><span>Less: Salaries</span><strong>-${this.formatCurrency(metrics.baselines.salary)}</strong></div>
                             <div style="display:flex; justify-content:space-between; margin-top:12px; padding-top:14px; border-top:1px solid rgba(255,255,255,0.15); font-size:1.05rem;"><span style="font-weight:700;">Operating Profit / Loss</span><strong style="color:${metrics.operatingProfit >= 0 ? '#7ED957' : '#FF8B8B'}">${this.formatCurrency(metrics.operatingProfit)}</strong></div>
+                        </div>
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:minmax(320px, 0.9fr) minmax(320px, 1.1fr); gap:24px; margin-bottom:24px;">
+                        <div class="panel">
+                            <h3 style="margin-top:0;"><i class="fa-solid fa-sliders" style="color:var(--primary)"></i> Executive Finance Controls</h3>
+                            <p style="color:var(--gray); margin:6px 0 18px 0;">Set the percentages used in the consolidated profit calculation.</p>
+                            <form onsubmit="event.preventDefault(); app.saveExecutiveFinanceSettings();">
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                                    <div class="input-floating">
+                                        <input type="number" id="executiveVatPercentage" min="0" step="0.01" value="${this.vatPercentage}" required>
+                                        <label>VAT Percentage</label>
+                                    </div>
+                                    <div class="input-floating">
+                                        <input type="number" id="executiveMaintenancePercentage" min="0" step="0.01" value="${this.maintenancePercentage}" required>
+                                        <label>Maint Percentage</label>
+                                    </div>
+                                </div>
+                                <button class="btn-primary" style="margin-top:12px; justify-content:center;">
+                                    <i class="fa-solid fa-floppy-disk"></i> Save Percentages
+                                </button>
+                            </form>
+                        </div>
+                        <div class="panel">
+                            <h3 style="margin-top:0;"><i class="fa-solid fa-building-circle-check" style="color:var(--primary)"></i> Rent Registry</h3>
+                            <p style="color:var(--gray); margin:6px 0 18px 0;">Annual rent is now controlled from the executive dashboard.</p>
+                            <form id="rentForm" onsubmit="event.preventDefault(); app.upsertRentEntry();">
+                                <input type="hidden" id="rentEditLocation" value="${editingRent?.location || ''}">
+                                <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;">
+                                    <div class="input-floating">
+                                        <select id="rentLocation" required>
+                                            ${locations.map(loc => `<option value="${loc}" ${editingRent?.location === loc ? 'selected' : ''}>${loc}</option>`).join('')}
+                                        </select>
+                                        <label style="top:5px; font-size:0.7rem;">Location</label>
+                                    </div>
+                                    <div class="input-floating">
+                                        <input type="text" id="rentAmount" value="${this.formatCurrencyInputValue(editingRent?.amount || '')}" data-currency inputmode="numeric" autocomplete="off" required>
+                                        <label>Annual Rent (₦)</label>
+                                    </div>
+                                </div>
+                                <button class="btn-primary" style="margin-top:12px; justify-content:center;">
+                                    <i class="fa-solid fa-cloud-arrow-up"></i> ${editingRent ? 'Update Annual Rent' : 'Save Annual Rent'}
+                                </button>
+                            </form>
+                            <div style="margin-top:20px; border-top:1px solid #eee; padding-top:16px;">
+                                <div style="font-size:0.9rem; color:var(--gray); margin-bottom:12px;">Allocated Rent For Selected Period</div>
+                                <div style="font-size:2rem; font-weight:700;">${this.formatCurrency(metrics.baselines.rent)}</div>
+                            </div>
                         </div>
                     </div>
 
@@ -7234,6 +7297,22 @@
                                 </table>
                             </div>
                         `}
+                    </div>
+
+                    <div class="panel">
+                        <h3 style="margin-top:0;">Rent Ledger</h3>
+                        ${this.rentRegistry.length === 0 ? `<div style="padding:24px 0; color:var(--gray);">No rent entries added yet.</div>` : this.rentRegistry.map(entry => `
+                            <div style="display:flex; justify-content:space-between; gap:16px; padding:16px 0; border-bottom:1px solid #eee;">
+                                <div>
+                                    <div style="font-weight:600;">${entry.location}</div>
+                                    <div style="font-size:0.82rem; color:var(--gray);">Annual baseline controlled by executive</div>
+                                </div>
+                                <div style="display:flex; gap:12px; align-items:center;">
+                                    <strong>${this.formatCurrency(entry.amount)} / year</strong>
+                                    <button class="btn-outline" onclick="app.startEditRentEntry('${entry.location}')"><i class="fa-solid fa-pen"></i></button>
+                                </div>
+                            </div>
+                        `).join('')}
                     </div>
 
                     <div class="panel">

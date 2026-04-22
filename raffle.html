@@ -1,0 +1,1226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookily Weekly Raffle Draw</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700;800&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <style>
+        :root {
+            --primary: #FF385C;
+            --primary-hover: #E31C5F;
+            --dark: #1A1A1A;
+            --gray: #717171;
+            --light-gray: #F7F7F7;
+            --white: #FFFFFF;
+            --gold: #FFB400;
+            --success: #00A699;
+            --bg-gradient: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: var(--bg-gradient);
+            color: var(--dark);
+            min-height: 100vh;
+            margin: 0;
+            overflow-x: hidden;
+            transition: background 1.5s ease;
+        }
+
+        body.is-spinning { background: #0a0a0a; }
+        .brand-font { font-family: 'Playfair Display', serif; }
+
+        .page-shell {
+            position: relative;
+            isolation: isolate;
+        }
+
+        .top-nav {
+            max-width: 1200px;
+            margin: 0 auto 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1rem;
+        }
+
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 0.8rem 1rem;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.78);
+            border: 1px solid rgba(0,0,0,0.05);
+            color: var(--dark);
+            text-decoration: none;
+            font-weight: 600;
+            box-shadow: 0 10px 24px rgba(0,0,0,0.06);
+            backdrop-filter: blur(16px);
+        }
+
+        .back-link:hover { transform: translateY(-1px); }
+
+        .panel {
+            background: var(--white);
+            border-radius: 16px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.03);
+            padding: 1.25rem;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 50px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            font-size: 1rem;
+            box-shadow: 0 6px 15px rgba(255, 56, 92, 0.25);
+            width: 100%;
+        }
+
+        @media (min-width: 768px) {
+            .btn-primary { width: auto; font-size: 1.1rem; padding: 14px 28px; }
+            .panel { padding: 1.5rem; border-radius: 20px; }
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 56, 92, 0.35);
+        }
+
+        .btn-primary:disabled {
+            background: var(--gray);
+            cursor: not-allowed;
+            box-shadow: none;
+            opacity: 0.7;
+        }
+
+        .prize-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px;
+            border-radius: 12px;
+            background: var(--light-gray);
+            border: 1px solid rgba(0,0,0,0.02);
+            transition: transform 0.2s;
+        }
+
+        .prize-img {
+            width: 45px;
+            height: 45px;
+            border-radius: 8px;
+            object-fit: cover;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            flex-shrink: 0;
+        }
+
+        .wheel-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 420px;
+            aspect-ratio: 1 / 1;
+            margin: 0 auto;
+            filter: drop-shadow(0 15px 30px rgba(0,0,0,0.15));
+            transition: transform 1.5s cubic-bezier(0.175, 0.885, 0.32, 1.275), filter 1.5s ease;
+        }
+
+        .wheel-container {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            overflow: hidden;
+            border: 6px solid var(--white);
+            position: relative;
+            background: var(--light-gray);
+        }
+
+        @media (min-width: 768px) {
+            .wheel-container { border-width: 8px; }
+            .wheel-wrapper { max-width: 480px; }
+        }
+
+        #wheelCanvas {
+            width: 100%;
+            height: 100%;
+        }
+
+        .wheel-pointer {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 30px;
+            height: 40px;
+            background: var(--primary);
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+            z-index: 10;
+            filter: drop-shadow(0 4px 6px rgba(0,0,0,0.3));
+            transform-origin: top center;
+        }
+
+        .wheel-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 50px;
+            height: 50px;
+            background: var(--white);
+            border-radius: 50%;
+            z-index: 5;
+            box-shadow: 0 0 10px rgba(0,0,0,0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: var(--primary);
+            font-family: 'Playfair Display', serif;
+            font-size: 1.25rem;
+            transition: transform 0.1s ease;
+        }
+
+        .wheel-center.impact {
+            transform: translate(-50%, -50%) scale(1.4);
+            color: var(--gold);
+        }
+
+        .dim-during-spin { transition: opacity 1.5s ease, filter 1.5s ease; }
+        body.is-spinning .dim-during-spin {
+            opacity: 0.05;
+            filter: blur(8px);
+            pointer-events: none;
+        }
+
+        body.is-spinning .wheel-wrapper {
+            transform: scale(1.05);
+            filter: drop-shadow(0 0 40px rgba(255, 56, 92, 0.4));
+            z-index: 50;
+        }
+
+        @media (min-width: 768px) {
+            body.is-spinning .wheel-wrapper { transform: scale(1.15); }
+        }
+
+        .winner-entry {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 8px;
+            border-radius: 10px;
+            background: rgba(255, 180, 0, 0.08);
+            border-left: 3px solid var(--gold);
+            animation: slideIn 0.5s ease forwards;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-20px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+
+        #confetti {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 999;
+        }
+
+        #dynamic-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.5s;
+            backdrop-filter: blur(5px);
+            padding: 1rem;
+        }
+
+        #dynamic-overlay.active {
+            opacity: 1;
+            pointer-events: all;
+        }
+
+        .overlay-box {
+            background: var(--white);
+            padding: 2rem;
+            border-radius: 24px;
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+            transform: scale(0.8);
+            transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        #dynamic-overlay.active .overlay-box { transform: scale(1); }
+
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
+        .custom-scroll::-webkit-scrollbar-track { background: transparent; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="p-3 md:p-6 lg:p-8">
+    <div class="page-shell">
+        <canvas id="confetti"></canvas>
+
+        <div class="top-nav dim-during-spin">
+            <a class="back-link" href="./index.html">
+                <i class="fa-solid fa-arrow-left"></i>
+                Back to Bookily
+            </a>
+            <div class="hidden md:flex items-center gap-2 bg-white/80 px-4 py-2 rounded-full shadow-sm text-sm font-medium">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                Friday Live Draw Page
+            </div>
+        </div>
+
+        <header class="max-w-6xl mx-auto mb-4 md:mb-8 flex items-center justify-between dim-during-spin">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 md:w-12 md:h-12 rounded-full bg-[#FF385C] flex items-center justify-center text-white font-bold text-xl md:text-2xl shadow-md">
+                    B
+                </div>
+                <div>
+                    <h1 class="text-xl md:text-3xl font-bold leading-tight brand-font">Bookily Stays</h1>
+                    <p class="text-xs md:text-sm text-gray-500 font-medium tracking-wide">WEEKLY GUEST RAFFLE</p>
+                </div>
+            </div>
+            <div class="hidden md:flex items-center gap-2 bg-white px-4 py-2 rounded-full shadow-sm text-sm font-medium">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                Live Event
+            </div>
+        </header>
+
+        <main class="max-w-6xl mx-auto flex flex-col gap-6">
+            <div class="panel bg-white/60 backdrop-blur-md border border-[#FF385C]/20 text-center dim-during-spin shadow-sm relative overflow-hidden">
+                <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-[#FFB400] via-[#FF385C] to-[#00A699]"></div>
+
+                <h2 class="text-xl md:text-2xl font-bold brand-font text-[#FF385C] mb-2">Weekly Raffle Draw for our Guests</h2>
+                <p class="text-sm md:text-base text-gray-700 mb-1 max-w-3xl mx-auto">
+                    Every Friday we randomly select one of our guests and reward them with a gift
+                    <br><span class="font-medium">(100% Refund, Free Night, 25% Off, Free Lunch, etc)</span>.
+                </p>
+                <p class="text-xs md:text-sm text-gray-500 font-medium mb-4 italic">
+                    It's our way of rewarding our guests. It's Free and not Gambling.
+                </p>
+
+                <div class="inline-flex flex-col items-center bg-[#1A1A1A] text-white px-4 py-3 md:px-6 md:py-4 rounded-[1.5rem] font-bold text-xs md:text-sm shadow-lg animate-pulse border border-gray-700">
+                    <div class="flex items-center">
+                        <i class="fa-regular fa-clock text-[#FFB400] mr-2 text-lg"></i>
+                        <span id="countdown-label">Countdown to Friday 5:00pm</span>
+                    </div>
+                    <div id="countdown-timer" class="mt-2 text-lg md:text-2xl tracking-[0.18em] font-semibold text-[#FFB400]">-- : -- : -- : --</div>
+                    <div id="countdown-date" class="mt-1 text-[11px] md:text-xs font-medium text-white/70">Calculating next draw time...</div>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-6 lg:gap-8">
+                <div class="w-full lg:w-7/12 order-1 lg:order-2 flex flex-col items-center">
+                    <div class="text-center mb-4 md:mb-6 dim-during-spin w-full" id="spin-header">
+                        <h2 class="text-3xl md:text-4xl brand-font font-bold mb-1">Spin to Win!</h2>
+                        <div class="inline-block bg-gray-100 px-4 py-1.5 rounded-full mt-2">
+                            <p class="text-gray-600 font-medium text-sm md:text-base"><strong id="current-phase-text" class="text-[#FF385C]">One of our guest in this spinwheel must win a reward!</strong></p>
+                        </div>
+                    </div>
+
+                    <div id="drama-text" class="text-center text-[#FF385C] text-2xl md:text-3xl font-bold opacity-0 transition-all duration-300 absolute top-10 z-50 drop-shadow-md w-full px-4 pointer-events-none">
+                        Building up suspense...
+                    </div>
+
+                    <div class="wheel-wrapper my-4 md:my-8">
+                        <div class="wheel-pointer"></div>
+                        <div class="wheel-center">B</div>
+                        <div class="wheel-container">
+                            <canvas id="wheelCanvas"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="w-full max-w-sm mt-4 md:mt-6 dim-during-spin px-4 md:px-0">
+                        <button id="spinBtn" class="btn-primary" onclick="spinWheel()">
+                            <i class="fa-solid fa-building"></i> Spin for Apartment
+                        </button>
+                    </div>
+                </div>
+
+                <div class="w-full lg:w-5/12 order-2 lg:order-1 flex flex-col gap-4 dim-during-spin">
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                        <div class="panel border-t-4 border-[#FFB400] flex flex-col h-full">
+                            <div class="flex justify-between items-center mb-3">
+                                <h2 class="text-lg font-bold brand-font"><i class="fa-solid fa-trophy text-[#FFB400] mr-2"></i> This Week's Winner</h2>
+                                <span id="winner-count" class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-bold">0 / 1</span>
+                            </div>
+                            <div id="winners-list" class="space-y-2 flex-1 custom-scroll overflow-y-auto min-h-[100px] max-h-[180px] pr-1">
+                                <div class="text-gray-400 text-sm text-center py-6 italic">No winner yet. Let the games begin!</div>
+                            </div>
+                        </div>
+
+                        <div class="panel bg-gray-900 text-white flex flex-col h-full">
+                            <div class="flex justify-between items-center mb-3">
+                                <h2 class="text-lg font-bold brand-font text-white"><i class="fa-solid fa-list-check text-[#00A699] mr-2"></i> Eligible Stays</h2>
+                                <span id="eligible-count" class="bg-gray-800 text-[10px] px-2 py-1 rounded"></span>
+                            </div>
+                            <div id="eligible-list" class="space-y-1.5 flex-1 custom-scroll overflow-y-auto min-h-[100px] max-h-[180px] pr-1"></div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
+                        <div class="panel border-t-4 border-gray-300 flex flex-col h-full">
+                            <div class="flex justify-between items-center mb-3">
+                                <h2 class="text-lg font-bold brand-font text-gray-800"><i class="fa-solid fa-clock-rotate-left text-gray-500 mr-2"></i> Last Week</h2>
+                                <span id="last-week-count" class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-bold"></span>
+                            </div>
+                            <div id="last-week-list" class="space-y-1.5 flex-1 custom-scroll overflow-y-auto min-h-[100px] max-h-[180px] pr-1"></div>
+                        </div>
+
+                        <div class="panel flex flex-col h-full">
+                            <h2 class="text-lg font-bold mb-3 brand-font"><i class="fa-solid fa-gift text-[#FF385C] mr-2"></i> Available Rewards</h2>
+                            <div id="prize-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 custom-scroll overflow-y-auto max-h-[220px] pr-1"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <div id="dynamic-overlay">
+            <div class="overlay-box">
+                <div id="overlay-icon"></div>
+                <h2 id="overlay-title" class="text-2xl md:text-3xl brand-font font-bold mb-2 text-gray-900"></h2>
+                <p id="overlay-subtitle" class="text-base md:text-lg text-gray-600 mb-4"></p>
+
+                <div class="bg-gray-50 border border-gray-100 p-4 rounded-xl mb-6 shadow-inner">
+                    <h3 id="overlay-highlight" class="text-xl md:text-2xl font-bold text-[#FF385C]"></h3>
+                </div>
+
+                <p id="overlay-footer" class="text-sm md:text-base text-gray-500 mb-6"></p>
+
+                <button id="overlay-btn" class="btn-primary w-full" onclick="handleOverlayClick()">
+                    Continue <i class="fa-solid fa-arrow-right ml-2"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://ozodqvrjzlcjgorntazt.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im96b2RxdnJqemxjamdvcm50YXp0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQ5NDAxNDMsImV4cCI6MjA5MDUxNjE0M30.TC4eylpgt3jFaNYQosaAYp_l_ojVMrgtHTnce274tk0';
+        const supabaseClient = window.supabase?.createClient
+            ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+            : null;
+
+        let audioCtx;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+
+        function playTick() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(300, audioCtx.currentTime + 0.05);
+            gain.gain.setValueAtTime(0.05, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.05);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.05);
+        }
+
+        function playBounce() {
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5);
+            gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.5);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.5);
+        }
+
+        function playBreak() {
+            if (!audioCtx) return;
+            const bufferSize = audioCtx.sampleRate * 0.1;
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.value = 1000;
+
+            const gain = audioCtx.createGain();
+            noise.connect(filter);
+            filter.connect(gain);
+            gain.connect(audioCtx.destination);
+
+            gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+            noise.start();
+        }
+
+        function playWin() {
+            if (!audioCtx) return;
+            const freqs = [440, 554.37, 659.25, 880];
+            freqs.forEach((f, i) => {
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+                osc.type = 'square';
+                osc.frequency.value = f;
+                gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                gain.gain.linearRampToValueAtTime(0.1, audioCtx.currentTime + 0.1 + i * 0.05);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 2.0);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 2.0);
+            });
+        }
+
+        let gamePhase = 'apartment';
+        let currentVisualAngle = 0;
+        let isSpinning = false;
+        let winners = [];
+        let pegs = [];
+        const MAX_WINNERS = 1;
+        let selectedApartmentObj = null;
+        let physicsRafId = null;
+
+        let mockGuests = [];
+        let lastWeekWinners = [];
+
+        const mockPrizes = [
+            { name: "Free Night", desc: "Free Night on next Booking", image: "https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=150&q=80" },
+            { name: "100% Refund", desc: "100% Refund for a night", image: "https://images.unsplash.com/photo-1580519542036-ed47f3e42d1d?w=150&q=80" },
+            { name: "50% Refund", desc: "50% Refund for a night", image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=150&q=80" },
+            { name: "20% Refund", desc: "20% Refund for a night", image: "https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=150&q=80" },
+            { name: "50% Off", desc: "50% Off Next Booking", image: "https://images.unsplash.com/photo-1607083206968-13611e3d76db?w=150&q=80" },
+            { name: "25% Off", desc: "25% Off Next Booking", image: "https://images.unsplash.com/photo-1607083206968-13611e3d76db?w=150&q=80" },
+            { name: "10% Off", desc: "10% Off Next Booking", image: "https://images.unsplash.com/photo-1607083206968-13611e3d76db?w=150&q=80" },
+            { name: "5% Off", desc: "5% Off Next Booking", image: "https://images.unsplash.com/photo-1607083206968-13611e3d76db?w=150&q=80" },
+            { name: "Free Breakfast", desc: "Free Breakfast during stay", image: "https://images.unsplash.com/photo-1533089860892-a7c6f0a88666?w=150&q=80" },
+            { name: "Free Lunch", desc: "Free Lunch during stay", image: "https://images.unsplash.com/photo-1544148103-0773bf10d330?w=150&q=80" },
+            { name: "Free Ride", desc: "Free Ride during stay", image: "https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=150&q=80" },
+            { name: "Free Massage", desc: "Free Massage session", image: "https://images.unsplash.com/photo-1540555700478-4be289fbecef?w=150&q=80" }
+        ];
+
+        const wheelColors = ['#FF385C', '#1A1A1A', '#00A699', '#FFB400', '#0066cc', '#717171', '#FC642D', '#2d3748'];
+
+        const canvas = document.getElementById('wheelCanvas');
+        const ctx = canvas.getContext('2d');
+        const spinBtn = document.getElementById('spinBtn');
+        const overlay = document.getElementById('dynamic-overlay');
+        const phaseText = document.getElementById('current-phase-text');
+
+        async function init() {
+            renderPrizes();
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+            await loadLiveRaffleData();
+            renderEligibleStays();
+            renderWinners();
+            renderLastWeekWinners();
+            drawWheel(currentVisualAngle);
+        }
+
+        function getNextFridayAtFive(baseDate = new Date()) {
+            const target = new Date(baseDate);
+            const day = target.getDay();
+            const daysUntilFriday = (5 - day + 7) % 7;
+            target.setDate(target.getDate() + daysUntilFriday);
+            target.setHours(17, 0, 0, 0);
+
+            if (target <= baseDate) {
+                target.setDate(target.getDate() + 7);
+            }
+
+            return target;
+        }
+
+        function getPreviousFridayAtFive(baseDate = new Date()) {
+            const next = getNextFridayAtFive(baseDate);
+            next.setDate(next.getDate() - 7);
+            return next;
+        }
+
+        function updateCountdown() {
+            const timerEl = document.getElementById('countdown-timer');
+            const labelEl = document.getElementById('countdown-label');
+            const dateEl = document.getElementById('countdown-date');
+            if (!timerEl || !labelEl || !dateEl) return;
+
+            const now = new Date();
+            const target = getNextFridayAtFive(now);
+            const diff = target.getTime() - now.getTime();
+
+            const totalSeconds = Math.max(0, Math.floor(diff / 1000));
+            const days = Math.floor(totalSeconds / 86400);
+            const hours = Math.floor((totalSeconds % 86400) / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const seconds = totalSeconds % 60;
+
+            timerEl.textContent = [
+                String(days).padStart(2, '0'),
+                String(hours).padStart(2, '0'),
+                String(minutes).padStart(2, '0'),
+                String(seconds).padStart(2, '0')
+            ].join(' : ');
+
+            labelEl.textContent = 'Countdown to Friday 5:00pm';
+            dateEl.textContent = `${target.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })} at ${target.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })} local time`;
+        }
+
+        async function loadLiveRaffleData() {
+            const winnersListEl = document.getElementById('winners-list');
+            const eligibleListEl = document.getElementById('eligible-list');
+            const lastWeekListEl = document.getElementById('last-week-list');
+
+            if (winnersListEl) winnersListEl.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 italic">Loading live raffle data...</div>';
+            if (eligibleListEl) eligibleListEl.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">Loading occupied stays...</div>';
+            if (lastWeekListEl) lastWeekListEl.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">Loading previous winners...</div>';
+
+            if (!supabaseClient) {
+                if (eligibleListEl) eligibleListEl.innerHTML = '<div class="text-red-400 text-xs italic py-2 text-center">Supabase client unavailable.</div>';
+                return;
+            }
+
+            const now = new Date();
+            const currentWeekStart = getPreviousFridayAtFive(now);
+            const lastWeekStart = new Date(currentWeekStart);
+            lastWeekStart.setDate(lastWeekStart.getDate() - 7);
+
+            const [
+                propertiesResponse,
+                bookingsResponse,
+                raffleResponse
+            ] = await Promise.all([
+                supabaseClient
+                    .from('properties')
+                    .select('id, property_name, location, status, guest_name'),
+                supabaseClient
+                    .from('bookings')
+                    .select('*')
+                    .order('booking_date', { ascending: false })
+                    .limit(500),
+                supabaseClient
+                    .from('raffle_winners')
+                    .select('*')
+                    .gte('drawn_at', lastWeekStart.toISOString())
+                    .order('drawn_at', { ascending: false })
+            ]);
+
+            if (propertiesResponse.error) console.warn('Failed to load occupied properties:', propertiesResponse.error);
+            if (bookingsResponse.error) console.warn('Failed to load bookings:', bookingsResponse.error);
+            if (raffleResponse.error) console.warn('Failed to load raffle winners:', raffleResponse.error);
+
+            const properties = Array.isArray(propertiesResponse.data) ? propertiesResponse.data : [];
+            const occupiedProperties = properties.filter(row => row.status === 'occupied');
+            const bookings = Array.isArray(bookingsResponse.data) ? bookingsResponse.data : [];
+            const raffleRows = Array.isArray(raffleResponse.data) ? raffleResponse.data : [];
+
+            const bookingLookup = new Map(bookings.map(row => [row.id, row]));
+            const propertyLookup = new Map(properties.map(row => [row.id, row]));
+            const bookingsByProperty = new Map();
+
+            bookings.forEach(row => {
+                const arr = bookingsByProperty.get(row.property_id) || [];
+                arr.push(row);
+                bookingsByProperty.set(row.property_id, arr);
+            });
+
+            mockGuests = occupiedProperties
+                .filter(row => row.guest_name)
+                .map(row => {
+                    const propertyBookings = bookingsByProperty.get(row.id) || [];
+                    const matchedBooking = propertyBookings.find(booking => booking.guest_name === row.guest_name) || propertyBookings[0] || null;
+                    return {
+                        id: row.id,
+                        location: row.location || row.property_name || 'Booked stay',
+                        propertyName: row.property_name || row.location || 'Booked stay',
+                        guestName: row.guest_name || matchedBooking?.guest_name || 'Guest',
+                        transactionId: matchedBooking?.id || '',
+                        checkIn: matchedBooking?.check_in || '',
+                        checkOut: matchedBooking?.check_out || ''
+                    };
+                });
+
+            const currentWeekRows = raffleRows.filter(row => new Date(row.drawn_at) >= currentWeekStart);
+            const lastWeekRows = raffleRows.filter(row => {
+                const drawnAt = new Date(row.drawn_at);
+                return drawnAt >= lastWeekStart && drawnAt < currentWeekStart;
+            });
+
+            winners = currentWeekRows.slice(0, MAX_WINNERS).map(row => {
+                const booking = bookingLookup.get(row.booking_id) || null;
+                const property = propertyLookup.get(booking?.property_id) || null;
+                return {
+                    id: row.id,
+                    guest: {
+                        location: property?.location || booking?.property_location || booking?.property_name || 'Booked stay',
+                        propertyName: property?.property_name || booking?.property_name || property?.location || 'Booked stay',
+                        guestName: row.guest_name || booking?.guest_name || 'Guest',
+                        transactionId: row.booking_id || ''
+                    },
+                    prize: {
+                        name: row.prize || 'Raffle Reward',
+                        desc: 'Winner recorded from live raffle history.'
+                    }
+                };
+            });
+
+            lastWeekWinners = lastWeekRows.map(row => {
+                const booking = bookingLookup.get(row.booking_id) || null;
+                const property = propertyLookup.get(booking?.property_id) || null;
+                return {
+                    location: property?.location || booking?.property_location || booking?.property_name || row.guest_name || 'Booked stay',
+                    prize: row.prize || 'Raffle Reward',
+                    guestName: row.guest_name || booking?.guest_name || 'Guest'
+                };
+            });
+
+            const currentWinnerBookingIds = new Set(winners.map(entry => entry.guest.transactionId).filter(Boolean));
+            const currentWinnerGuests = new Set(winners.map(entry => entry.guest.guestName).filter(Boolean));
+            mockGuests = mockGuests.filter(guest => !currentWinnerBookingIds.has(guest.transactionId) && !currentWinnerGuests.has(guest.guestName));
+
+            if (winners.length >= MAX_WINNERS) {
+                spinBtn.disabled = true;
+                spinBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Raffle Complete';
+                phaseText.textContent = 'Winner already recorded for this week';
+            }
+        }
+
+        async function persistWinner(winnerEntry) {
+            if (!supabaseClient) return false;
+
+            const payload = {
+                guest_name: winnerEntry.guest.guestName || 'Guest',
+                prize: winnerEntry.prize.name || 'Raffle Reward',
+                booking_id: winnerEntry.guest.transactionId || null,
+                drawn_at: new Date().toISOString()
+            };
+
+            const { data, error } = await supabaseClient
+                .from('raffle_winners')
+                .insert(payload)
+                .select('*')
+                .single();
+
+            if (error) {
+                console.warn('Failed to persist raffle winner:', error);
+                return false;
+            }
+
+            if (data?.id) winnerEntry.id = data.id;
+            return true;
+        }
+
+        function getActiveWheelData() {
+            return gamePhase === 'apartment' ? mockGuests : mockPrizes;
+        }
+
+        function renderPrizes() {
+            document.getElementById('prize-list').innerHTML = mockPrizes.map(p => `
+                <div class="prize-card">
+                    <img src="${p.image}" alt="${p.name}" class="prize-img">
+                    <div class="overflow-hidden">
+                        <h4 class="font-bold text-gray-900 text-sm leading-tight truncate">${p.name}</h4>
+                        <p class="text-[11px] text-gray-500 truncate">${p.desc}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderEligibleStays() {
+            const container = document.getElementById('eligible-list');
+            document.getElementById('eligible-count').textContent = mockGuests.length + ' Remaining';
+            if (mockGuests.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">No eligible occupied stays found in the database.</div>';
+                return;
+            }
+
+            container.innerHTML = mockGuests.map(g => `
+                <div class="flex items-center gap-2 py-1.5 border-b border-gray-800 last:border-0">
+                    <div class="w-5 h-5 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
+                        <i class="fa-solid fa-door-closed text-gray-400 text-[10px]"></i>
+                    </div>
+                    <span class="text-xs font-medium text-gray-300 truncate">${g.guestName} in ${g.location}</span>
+                </div>
+            `).join('');
+        }
+
+        function renderWinners() {
+            const container = document.getElementById('winners-list');
+            document.getElementById('winner-count').textContent = `${winners.length} / ${MAX_WINNERS}`;
+            if (winners.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 italic">No winner yet. Let the games begin!</div>';
+                return;
+            }
+
+            container.innerHTML = winners.map(w => `
+                <div class="winner-entry">
+                    <div class="w-6 h-6 rounded-full bg-[#FFB400] text-white flex items-center justify-center font-bold text-xs flex-shrink-0"><i class="fa-solid fa-star"></i></div>
+                    <div class="flex-1 overflow-hidden">
+                        <div class="text-[10px] text-gray-500 uppercase font-semibold truncate">Guest in ${w.guest.location}</div>
+                        <div class="text-xs font-bold text-gray-900 truncate"><i class="fa-solid fa-gift text-[#FF385C] mr-1"></i> ${w.guest.guestName} won ${w.prize.name}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function renderLastWeekWinners() {
+            const container = document.getElementById('last-week-list');
+            document.getElementById('last-week-count').textContent = `${lastWeekWinners.length} Winners`;
+            if (lastWeekWinners.length === 0) {
+                container.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">No winners from last week.</div>';
+                return;
+            }
+
+            container.innerHTML = lastWeekWinners.map(w => `
+                <div class="flex items-center gap-2 py-2 border-b border-gray-100 last:border-0">
+                    <div class="w-6 h-6 rounded-full bg-gray-200 text-gray-500 flex items-center justify-center font-bold text-xs flex-shrink-0">
+                        <i class="fa-solid fa-clock-rotate-left text-[10px]"></i>
+                    </div>
+                    <div class="flex-1 overflow-hidden">
+                        <div class="text-[10px] text-gray-500 uppercase font-semibold truncate">${w.guestName || 'Guest'} in ${w.location}</div>
+                        <div class="text-xs font-bold text-gray-800 truncate"><i class="fa-solid fa-gift text-gray-400 mr-1 text-[10px]"></i> ${w.prize}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function dramaticEase(t) {
+            if (t < 0.2) return 12.5 * Math.pow(t, 3);
+            const n = (t - 0.2) / 0.8;
+            const easeOut = 1 - Math.pow(1 - n, 4);
+            return 0.1 + easeOut * 0.9;
+        }
+
+        function checkCrossing(prev, curr, target) {
+            const diff = curr - prev;
+            if (diff > 180) prev += 360;
+            else if (diff < -180) curr += 360;
+            if (prev <= target && curr >= target) return 1;
+            if (prev >= target && curr <= target) return -1;
+            return 0;
+        }
+
+        function showDramaText(msg, isBounce = false) {
+            const dramaText = document.getElementById('drama-text');
+            dramaText.textContent = msg;
+            dramaText.style.opacity = '1';
+
+            if (isBounce) {
+                dramaText.style.transform = 'scale(1.2)';
+                dramaText.style.color = '#FFB400';
+                setTimeout(() => {
+                    dramaText.style.transform = 'scale(1)';
+                    dramaText.style.color = '#FF385C';
+                }, 300);
+            }
+        }
+
+        function drawWheel(angle) {
+            const data = getActiveWheelData();
+            if (data.length === 0) return;
+
+            const dpr = window.devicePixelRatio || 1;
+            const rect = canvas.parentElement.getBoundingClientRect();
+            const size = rect.width;
+
+            canvas.width = size * dpr;
+            canvas.height = size * dpr;
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.scale(dpr, dpr);
+
+            const centerX = size / 2;
+            const centerY = size / 2;
+            const radius = size / 2;
+            const numSegments = data.length;
+            const arcSize = (2 * Math.PI) / numSegments;
+
+            ctx.clearRect(0, 0, size, size);
+
+            ctx.save();
+            ctx.translate(centerX, centerY);
+            ctx.rotate(angle * Math.PI / 180);
+
+            for (let i = 0; i < numSegments; i++) {
+                const segAngle = i * arcSize;
+                ctx.beginPath();
+                ctx.fillStyle = wheelColors[i % wheelColors.length];
+                ctx.moveTo(0, 0);
+                ctx.arc(0, 0, radius, segAngle, segAngle + arcSize);
+                ctx.fill();
+
+                ctx.lineWidth = 1.5;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                ctx.save();
+                ctx.rotate(segAngle + arcSize / 2);
+                ctx.textAlign = 'right';
+                ctx.fillStyle = '#fff';
+
+                const fontSize = Math.max(10, Math.min(14, radius * 0.08));
+                ctx.font = `bold ${fontSize}px Poppins`;
+
+                let text = gamePhase === 'apartment' ? data[i].location : data[i].name;
+                if (text.length > 20) text = text.substring(0, 18) + '...';
+
+                const inset = radius > 150 ? 25 : 15;
+                ctx.fillText(text, radius - inset, 4);
+                ctx.restore();
+            }
+
+            if (pegs.length > 0) {
+                for (let i = 0; i < numSegments; i++) {
+                    const peg = pegs[i];
+                    if (!peg) continue;
+                    ctx.save();
+                    ctx.rotate(peg.angleOffset * Math.PI / 180);
+                    ctx.translate(radius, 0);
+
+                    if (peg.isBroken) {
+                        ctx.fillStyle = '#222';
+                        ctx.fillRect(-8, -2.5, 8, 5);
+                    } else {
+                        const ext = peg.currentExtension || 0;
+                        const length = 4 + (ext * (radius > 150 ? 25 : 18));
+                        ctx.fillStyle = ext > 0.6 ? '#FF385C' : '#FFFFFF';
+                        ctx.fillRect(-8, -3, length + 8, 6);
+
+                        if (ext > 0.6) {
+                            ctx.shadowColor = '#FF385C';
+                            ctx.shadowBlur = 6;
+                            ctx.fillStyle = '#FFB400';
+                            ctx.beginPath();
+                            ctx.arc(length, 0, 3, 0, Math.PI * 2);
+                            ctx.fill();
+                        }
+                    }
+                    ctx.restore();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        window.addEventListener('resize', () => {
+            if (!isSpinning) drawWheel(currentVisualAngle);
+        });
+
+        function spinWheel() {
+            const data = getActiveWheelData();
+            if (isSpinning || data.length === 0) return;
+            if (winners.length >= MAX_WINNERS) {
+                alert('The winner has already been drawn for this week!');
+                return;
+            }
+
+            isSpinning = true;
+            spinBtn.disabled = true;
+            initAudio();
+            document.body.classList.add('is-spinning');
+
+            const numSegments = data.length;
+            const degreesPerSegment = 360 / numSegments;
+            pegs = data.map((_, i) => ({
+                id: i,
+                angleOffset: i * degreesPerSegment + (degreesPerSegment / 2),
+                isBroken: false,
+                extensionPhase: Math.random() * Math.PI * 2,
+                prevGlobalAngle: null
+            }));
+
+            const winningIndex = Math.floor(Math.random() * numSegments);
+            const segmentAngleStart = winningIndex * degreesPerSegment;
+            const randomOffset = Math.random() * (degreesPerSegment - 4) + 2;
+            const targetAngle = 270 - (segmentAngleStart + randomOffset);
+
+            const normalizedCurrent = currentVisualAngle % 360;
+            const rotationDiff = targetAngle - normalizedCurrent;
+            const extraSpins = 25;
+            let finalRotation = currentVisualAngle + (extraSpins * 360) + rotationDiff;
+            if (finalRotation < currentVisualAngle + (360 * 5)) finalRotation += 360 * 5;
+
+            const duration = 24000;
+            const startTime = Date.now();
+            const startRot = currentVisualAngle;
+
+            let pointerRotation = 0;
+            let pointerVelocity = 0;
+            let visualVelocity = 0;
+            let tickedThisFrame = false;
+
+            const phrases = gamePhase === 'apartment'
+                ? ['Initiating scan...', 'Maximum velocity...', 'Entering danger zone...', 'Watch out for pegs!', 'Slowing down...', 'It\'s a minefield!', 'Clear path...']
+                : ['Prizes loading...', 'High speed spin...', 'Pegs are coming out...', 'Will it bounce?', 'Slowing down...', 'Dodging pegs...', 'Locking in...'];
+            let phraseIdx = 0;
+
+            const pointerEl = document.querySelector('.wheel-pointer');
+            const centerEl = document.querySelector('.wheel-center');
+
+            function physicsLoop() {
+                const now = Date.now();
+                const elapsed = now - startTime;
+                const t = Math.min(elapsed / duration, 1.0);
+
+                const expectedPhraseIdx = Math.floor((t / 0.85) * phrases.length);
+                if (expectedPhraseIdx !== phraseIdx && expectedPhraseIdx < phrases.length) {
+                    phraseIdx = expectedPhraseIdx;
+                    showDramaText(phrases[phraseIdx]);
+                }
+                if (t > 0.90) showDramaText('Securing winner...');
+
+                const dEase = dramaticEase(t);
+                const drivenAngle = startRot + dEase * (finalRotation - startRot);
+
+                const diff = drivenAngle - currentVisualAngle;
+                visualVelocity += diff * 0.012;
+                visualVelocity *= 0.88;
+
+                if (visualVelocity > 60) visualVelocity = 60;
+                if (visualVelocity < -60) visualVelocity = -60;
+
+                currentVisualAngle += visualVelocity;
+
+                pointerVelocity -= pointerRotation * 0.15;
+                pointerVelocity *= 0.8;
+                pointerRotation += pointerVelocity;
+                pointerEl.style.transform = `translateX(-50%) rotate(${pointerRotation}deg)`;
+
+                const timeSec = now * 0.005;
+                tickedThisFrame = false;
+
+                const isDangerPhase = t > 0.35 && t < 0.85;
+
+                pegs.forEach(peg => {
+                    let ext = 0;
+                    if (isDangerPhase) {
+                        let intensity = 1.0;
+                        if (t < 0.45) intensity = (t - 0.35) * 10;
+                        if (t > 0.80) intensity = (0.85 - t) * 20;
+                        intensity = Math.max(0, Math.min(1, intensity));
+                        ext = ((Math.sin(timeSec * 4 + peg.extensionPhase) + 1) / 2) * intensity;
+                    }
+                    peg.currentExtension = ext;
+
+                    let pegGlobalAngle = (currentVisualAngle + peg.angleOffset) % 360;
+                    if (pegGlobalAngle < 0) pegGlobalAngle += 360;
+
+                    if (peg.prevGlobalAngle !== null) {
+                        const crossing = checkCrossing(peg.prevGlobalAngle, pegGlobalAngle, 270);
+
+                        if (crossing !== 0 && !tickedThisFrame) {
+                            tickedThisFrame = true;
+
+                            if (!peg.isBroken && ext > 0.6 && crossing === 1 && Math.abs(visualVelocity) > 1.5 && isDangerPhase) {
+                                visualVelocity = -35;
+                                peg.isBroken = true;
+                                pointerVelocity = -70;
+
+                                playBounce();
+                                playBreak();
+                                showDramaText('BOUNCE!', true);
+
+                                centerEl.classList.add('impact');
+                                setTimeout(() => centerEl.classList.remove('impact'), 150);
+                            } else {
+                                playTick();
+                                pointerVelocity = crossing === 1 ? -30 : 30;
+                            }
+                        }
+                    }
+                    peg.prevGlobalAngle = pegGlobalAngle;
+                });
+
+                drawWheel(currentVisualAngle);
+
+                if (t < 1.0 || Math.abs(visualVelocity) > 0.1 || Math.abs(diff) > 0.5) {
+                    physicsRafId = requestAnimationFrame(physicsLoop);
+                } else {
+                    currentVisualAngle = finalRotation;
+                    drawWheel(currentVisualAngle);
+
+                    document.body.classList.remove('is-spinning');
+                    document.getElementById('drama-text').style.opacity = '0';
+                    pointerEl.style.transform = 'translateX(-50%) rotate(0deg)';
+
+                    playWin();
+                    setTimeout(() => resolveSpinPhase(winningIndex), 1000);
+                }
+            }
+
+            if (physicsRafId) cancelAnimationFrame(physicsRafId);
+            physicsRafId = requestAnimationFrame(physicsLoop);
+        }
+
+        function resolveSpinPhase(winningIndex) {
+            if (gamePhase === 'apartment') {
+                selectedApartmentObj = mockGuests[winningIndex];
+
+                document.getElementById('overlay-icon').innerHTML = '<i class="fa-solid fa-building text-5xl md:text-6xl text-[#00A699] mb-4"></i>';
+                document.getElementById('overlay-title').textContent = 'Apartment Selected!';
+                document.getElementById('overlay-subtitle').textContent = `${selectedApartmentObj.guestName} is staying at:`;
+                document.getElementById('overlay-highlight').textContent = selectedApartmentObj.location;
+                document.getElementById('overlay-footer').textContent = 'Now, let\'s find out what reward is attached to this live booking.';
+                document.getElementById('overlay-btn').innerHTML = 'Spin for their Prize <i class="fa-solid fa-rotate-right ml-2"></i>';
+
+                overlay.classList.add('active');
+            } else {
+                const wonPrize = mockPrizes[winningIndex];
+                const winnerEntry = { guest: selectedApartmentObj, prize: wonPrize };
+                winners.push(winnerEntry);
+
+                mockGuests = mockGuests.filter(g => {
+                    if (selectedApartmentObj.transactionId && g.transactionId) return g.transactionId !== selectedApartmentObj.transactionId;
+                    return `${g.guestName}-${g.location}` !== `${selectedApartmentObj.guestName}-${selectedApartmentObj.location}`;
+                });
+
+                fireConfetti();
+                persistWinner(winnerEntry);
+
+                document.getElementById('overlay-icon').innerHTML = '<i class="fa-solid fa-crown text-5xl md:text-6xl text-[#FFB400] mb-4"></i>';
+                document.getElementById('overlay-title').textContent = 'We have a Winner!';
+                document.getElementById('overlay-subtitle').textContent = `${selectedApartmentObj.guestName} in ${selectedApartmentObj.location} has won:`;
+                document.getElementById('overlay-highlight').textContent = wonPrize.name;
+                document.getElementById('overlay-footer').textContent = wonPrize.desc;
+
+                const nextActionText = winners.length >= MAX_WINNERS ? 'Finish Draw' : 'Draw Next Winner';
+                document.getElementById('overlay-btn').innerHTML = `${nextActionText} <i class="fa-solid fa-arrow-right ml-2"></i>`;
+
+                overlay.classList.add('active');
+            }
+        }
+
+        function handleOverlayClick() {
+            overlay.classList.remove('active');
+            isSpinning = false;
+            pegs = [];
+
+            if (gamePhase === 'apartment') {
+                gamePhase = 'prize';
+                phaseText.textContent = 'Selecting Prize';
+                spinBtn.innerHTML = '<i class="fa-solid fa-gift"></i> Spin for Prize';
+                spinBtn.disabled = false;
+            } else {
+                gamePhase = 'apartment';
+                phaseText.textContent = 'One of our guest in this spinwheel must win a reward!';
+                spinBtn.innerHTML = '<i class="fa-solid fa-building"></i> Spin for Next Apartment';
+
+                renderWinners();
+                renderEligibleStays();
+
+                if (winners.length >= MAX_WINNERS) {
+                    spinBtn.disabled = true;
+                    spinBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Raffle Complete';
+                    phaseText.textContent = 'Draws Finished';
+                } else {
+                    spinBtn.disabled = false;
+                }
+            }
+            drawWheel(currentVisualAngle);
+        }
+
+        const confettiCanvas = document.getElementById('confetti');
+        const ctxConfetti = confettiCanvas.getContext('2d');
+        let particles = [];
+        let animationId;
+
+        function resizeConfetti() {
+            confettiCanvas.width = window.innerWidth;
+            confettiCanvas.height = window.innerHeight;
+        }
+
+        window.addEventListener('resize', resizeConfetti);
+        resizeConfetti();
+
+        function fireConfetti() {
+            particles = [];
+            for (let i = 0; i < 150; i++) {
+                particles.push({
+                    x: confettiCanvas.width / 2,
+                    y: confettiCanvas.height / 2,
+                    r: Math.random() * 5 + 3,
+                    dx: Math.random() * 20 - 10,
+                    dy: Math.random() * -20 - 5,
+                    color: wheelColors[Math.floor(Math.random() * wheelColors.length)],
+                    tilt: Math.floor(Math.random() * 10) - 10,
+                    tiltAngleInc: (Math.random() * 0.07) + 0.05,
+                    tiltAngle: 0
+                });
+            }
+            if (!animationId) animateConfetti();
+        }
+
+        function animateConfetti() {
+            animationId = requestAnimationFrame(animateConfetti);
+            ctxConfetti.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            let activeParticles = 0;
+            particles.forEach(p => {
+                p.tiltAngle += p.tiltAngleInc;
+                p.y += (Math.cos(p.tiltAngle) + 1 + p.r / 2) / 2;
+                p.x += Math.sin(p.tiltAngle) * 2;
+                p.dy += 0.08;
+                p.x += p.dx;
+                p.y += p.dy;
+                if (p.y <= confettiCanvas.height) {
+                    activeParticles++;
+                    ctxConfetti.beginPath();
+                    ctxConfetti.lineWidth = p.r;
+                    ctxConfetti.strokeStyle = p.color;
+                    ctxConfetti.moveTo(p.x + p.tilt + p.r, p.y);
+                    ctxConfetti.lineTo(p.x + p.tilt, p.y + p.tilt + p.r);
+                    ctxConfetti.stroke();
+                }
+            });
+            if (activeParticles === 0) {
+                cancelAnimationFrame(animationId);
+                animationId = null;
+                ctxConfetti.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+            }
+        }
+
+        window.addEventListener('load', () => {
+            setTimeout(init, 200);
+        });
+    </script>
+</body>
+</html>

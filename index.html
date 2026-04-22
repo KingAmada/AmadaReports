@@ -101,6 +101,7 @@
             <div class="nav-links">
                 <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
                 <a href="#" onclick="switchView('host'); return false;">List Your Property</a>
+                <a href="./raffle.html">Raffle Draw</a>
                 <button class="btn-outline" onclick="openGuestAccessModal()"><i class="fa-solid fa-key"></i> Guest Login</button>
                 <button id="installAppButton" class="btn-outline install-app-button" onclick="promptPwaInstall()" hidden><i class="fa-solid fa-download"></i> Install App</button>
                 <button class="btn-outline" onclick="openLoginModal()"><i class="fa-solid fa-lock"></i> Host Login</button>
@@ -193,9 +194,14 @@
                     <br><strong style="color: white; font-size: 1.2rem;">🌟 Every Friday: One lucky guest wins a 100% REFUND!</strong>
                     <br><strong style="color: #FFD700; font-size: 1.1rem;">🏠 Full House Days: When we hit 100% occupancy, a random guest wins 25% OFF!</strong>
                 </div>
-                <button class="btn-primary" style="background: #FFD700; color: #1A1A1A; font-size: 1.1rem; padding: 15px 40px;" onclick="document.getElementById('searchLoc').focus()">
-                    <i class="fa-solid fa-ticket"></i> Book Now & Enter Draws
-                </button>
+                <div style="display:flex; justify-content:center; flex-wrap:wrap; gap:14px;">
+                    <button class="btn-primary" style="background: #FFD700; color: #1A1A1A; font-size: 1.1rem; padding: 15px 40px;" onclick="document.getElementById('searchLoc').focus()">
+                        <i class="fa-solid fa-ticket"></i> Book Now & Enter Draws
+                    </button>
+                    <a href="./raffle.html" class="btn-outline" style="border-color:#FFD700; color:#FFD700; padding:15px 40px; text-decoration:none;">
+                        <i class="fa-solid fa-trophy"></i> View Raffle Page
+                    </a>
+                </div>
             </div>
         </section>
 
@@ -216,32 +222,32 @@
             <div class="host-page-shell host-page-hero-grid">
                 <div class="host-page-copy">
                     <span class="host-kicker"><i class="fa-solid fa-building-circle-check"></i> Dedicated For Hosts</span>
-                    <h1>List Your Property. Let Bookily Fill It, Price It, And Run It.</h1>
-                    <p>Turn your apartment into a high-performing shortlet business with a page built to attract serious hosts. We handle demand capture, smart pricing, guest access flow, and the day-to-day operating pressure that slows revenue down.</p>
+                    <h1>Your apartment should not sit empty because pricing was wrong, messages were missed, or check-ins were messy.</h1>
+                    <p>Most hosts do not lose money because the property is bad. They lose money because demand is inconsistent, guest handling is slow, and nobody has a clear system for pricing, access, occupancy, and reporting. Bookily is built to fix that gap.</p>
                     <div class="host-page-actions">
                         <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Register Your Property</button>
-                        <button class="btn-outline host-dark-outline" onclick="document.getElementById('hostRevenueEstimator').scrollIntoView({behavior: 'smooth'})">Estimate Revenue</button>
+                        <button class="btn-outline host-dark-outline" onclick="document.getElementById('hostRevenueEstimator').scrollIntoView({behavior: 'smooth'})">See Revenue Potential</button>
                     </div>
                     <div class="host-proof-band">
-                        <div><strong>45+</strong><span>Premium Units Managed</span></div>
-                        <div><strong>₦850M+</strong><span>Revenue Generated</span></div>
-                        <div><strong>40%</strong><span>Higher Yield Potential</span></div>
+                        <div><strong>45+</strong><span>Units already managed through the engine</span></div>
+                        <div><strong>₦850M+</strong><span>Revenue already pushed through bookings</span></div>
+                        <div><strong>40%</strong><span>Potential uplift when pricing and occupancy are handled properly</span></div>
                     </div>
                 </div>
                 <div class="host-page-showcase">
                     <div class="host-showcase-card host-showcase-primary">
-                        <span>Tonight's Snapshot</span>
-                        <strong>18 units occupied</strong>
-                        <p>Inventory synced, rates adjusted, access codes ready, and upcoming check-ins already routed.</p>
+                        <span>What Hosts Actually Want</span>
+                        <strong>Fewer empty nights. Fewer pricing mistakes. Less operational stress.</strong>
+                        <p>If your unit is good but bookings still feel inconsistent, the problem is usually not the apartment. It is the system around it.</p>
                     </div>
                     <div class="host-showcase-stack">
                         <div class="host-showcase-card">
-                            <span>Automation Layer</span>
-                            <strong>Dynamic pricing + lock sync</strong>
+                            <span>Revenue Problem</span>
+                            <strong>Underpricing on busy dates or sitting empty on slow ones</strong>
                         </div>
                         <div class="host-showcase-card">
-                            <span>Operations Layer</span>
-                            <strong>Bookings, payouts, reporting</strong>
+                            <span>Operations Problem</span>
+                            <strong>Guest chats, access codes, receipts, and follow-up living in too many places</strong>
                         </div>
                     </div>
                 </div>
@@ -251,29 +257,29 @@
         <section class="host-page-section">
             <div class="host-page-shell">
                 <div class="host-section-heading">
-                    <span>Why Hosts Join</span>
-                    <h2>A dedicated page built to convert owners, not just open a form.</h2>
+                    <span>Why Hosts Stay</span>
+                    <h2>Clear reasons property owners move when the old way stops making sense.</h2>
                 </div>
                 <div class="host-benefits-grid">
                     <article class="host-benefit-card">
                         <i class="fa-solid fa-chart-line"></i>
-                        <h3>Revenue First</h3>
-                        <p>Rates adjust around real Abuja demand so your unit is not underpriced on peak days or stale on weak ones.</p>
+                        <h3>Stop leaking money through weak pricing</h3>
+                        <p>A good apartment can still underperform if rates stay flat. Bookily helps position nightly pricing around live demand so strong dates are not sold too cheaply.</p>
                     </article>
                     <article class="host-benefit-card">
                         <i class="fa-solid fa-key"></i>
-                        <h3>Access Automation</h3>
-                        <p>Every booking can flow into access-code operations without manual key handovers or fragmented guest messaging.</p>
+                        <h3>Remove check-in friction</h3>
+                        <p>Hosts get tired of coordinating keys, late arrivals, and scattered guest instructions. Booking-linked access flow reduces that operational drag.</p>
                     </article>
                     <article class="host-benefit-card">
                         <i class="fa-solid fa-layer-group"></i>
-                        <h3>Operational Visibility</h3>
-                        <p>Track occupancy, payouts, and property performance in one place instead of piecing reports together manually.</p>
+                        <h3>See performance without chasing reports</h3>
+                        <p>If you cannot quickly see occupancy, payout status, and booking movement, you are managing blind. The engine keeps those numbers visible in one place.</p>
                     </article>
                     <article class="host-benefit-card">
                         <i class="fa-solid fa-headset"></i>
-                        <h3>Guest Handling</h3>
-                        <p>Bookings, receipts, promotions, and stay incentives run through one guest-facing engine that keeps demand active.</p>
+                        <h3>Turn demand into repeat bookings</h3>
+                        <p>Receipts, reward hooks, guest access, and booking follow-through should work together. That is how one stay becomes another instead of ending as a one-time transaction.</p>
                     </article>
                 </div>
             </div>
@@ -284,18 +290,18 @@
                 <div>
                     <div class="host-section-heading left">
                         <span>Revenue Estimator</span>
-                        <h2>Model what your unit can earn before you commit.</h2>
-                        <p>Use the estimator to see the kind of monthly revenue range your property could hit when it is positioned and managed correctly.</p>
+                        <h2>Check whether your unit is earning below what the market can actually support.</h2>
+                        <p>If you are still thinking about long rent numbers while short-stay demand is stronger in your area, this gives you a clearer picture before you commit.</p>
                     </div>
                     <ul class="host-check-list">
-                        <li><i class="fa-solid fa-circle-check"></i> Shortlet-focused pricing logic</li>
-                        <li><i class="fa-solid fa-circle-check"></i> Occupancy-based revenue forecast</li>
-                        <li><i class="fa-solid fa-circle-check"></i> Better clarity before onboarding</li>
+                        <li><i class="fa-solid fa-circle-check"></i> Compare your current income against stronger occupancy handling</li>
+                        <li><i class="fa-solid fa-circle-check"></i> See what better pricing can do over a full month</li>
+                        <li><i class="fa-solid fa-circle-check"></i> Decide with numbers before handing over the unit</li>
                     </ul>
                 </div>
                 <div class="calc-box">
                     <h3 style="font-size:1.5rem; margin-bottom:10px;">Estimate Your Earnings</h3>
-                    <p style="color:var(--gray); font-size:0.9rem;">See how much you could make by joining the Bookily Engine.</p>
+                    <p style="color:var(--gray); font-size:0.9rem;">Use a realistic occupancy assumption and see what your property could return monthly.</p>
                     
                     <div class="slider-container">
                         <label style="font-weight:600;">Property Location</label>
@@ -317,7 +323,7 @@
                     <div style="margin-top:40px; text-align:center; padding-top:20px; border-top:1px dashed #ddd;">
                         <p style="color:var(--gray); font-weight:500;">Projected Monthly Revenue</p>
                         <div class="calc-result" id="calcResult">₦2,250,000</div>
-                        <p style="font-size:0.8rem; color:var(--success);"><i class="fa-solid fa-arrow-trend-up"></i> +40% higher than traditional rent</p>
+                        <p style="font-size:0.8rem; color:var(--success);"><i class="fa-solid fa-arrow-trend-up"></i> Shows the upside when pricing and bookings are actively managed</p>
                     </div>
                 </div>
             </div>
@@ -327,23 +333,23 @@
             <div class="host-page-shell">
                 <div class="host-section-heading">
                     <span>How It Works</span>
-                    <h2>From listing to live operations in three steps.</h2>
+                    <h2>Simple enough for a busy owner, structured enough to run properly.</h2>
                 </div>
                 <div class="host-steps-grid">
                     <article class="host-step-card">
                         <strong>01</strong>
-                        <h3>Submit Your Property</h3>
-                        <p>Register the unit, area, and ownership details so we can qualify the listing correctly.</p>
+                        <h3>Register the unit</h3>
+                        <p>Share the property details, location, and ownership information so the listing can be set up correctly from the start.</p>
                     </article>
                     <article class="host-step-card">
                         <strong>02</strong>
-                        <h3>Set Up The Engine</h3>
-                        <p>We align pricing, inventory structure, guest access workflow, and the operational dashboard.</p>
+                        <h3>Set up pricing and operations</h3>
+                        <p>The unit is prepared for bookings, access handling, pricing structure, and operational tracking instead of being left to manual guesswork.</p>
                     </article>
                     <article class="host-step-card">
                         <strong>03</strong>
-                        <h3>Start Monetizing</h3>
-                        <p>Your property enters the guest funnel and management engine with clearer reporting and stronger occupancy handling.</p>
+                        <h3>Go live and monitor performance</h3>
+                        <p>Your property enters the booking flow with clearer visibility around occupancy, guest movement, and what the unit is actually earning.</p>
                     </article>
                 </div>
             </div>
@@ -353,8 +359,8 @@
             <div class="host-page-shell host-cta-box">
                 <div>
                     <span>Ready To List?</span>
-                    <h2>Give your property a page and system built to sell it.</h2>
-                    <p>Stop hiding host conversion inside a modal. Bring owners into a dedicated acquisition flow and register the property when they are ready.</p>
+                    <h2>If the property is valuable, the system around it should be valuable too.</h2>
+                    <p>Register your unit if you want fewer empty dates, cleaner guest handling, and a better grip on what the property should be earning.</p>
                 </div>
                 <div class="host-page-actions">
                     <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-file-signature"></i> Register & Set Up Profile</button>
@@ -494,7 +500,7 @@
             <section class="guest-raffle-banner-wrap">
                 <div class="guest-raffle-banner">
                     <i class="fa-solid fa-ticket"></i>
-                    <p>Every Friday 9:00PM we have a raffle draw for all our guests and 10 of them will Win Gifts. (<span id="guestRaffleCount">13</span>+ Guests already in this week Raffle.)</p>
+                    <p>Every Friday 9:00PM we have a raffle draw for all our guests and 10 of them will Win Gifts. (<span id="guestRaffleCount">13</span>+ Guests already in this week Raffle.) <a href="./raffle.html" class="underline font-semibold">Open raffle page</a></p>
                 </div>
             </section>
 
