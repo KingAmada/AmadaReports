@@ -618,6 +618,8 @@
 
             if (!supabaseClient) {
                 if (eligibleListEl) eligibleListEl.innerHTML = '<div class="text-red-400 text-xs italic py-2 text-center">Supabase client unavailable.</div>';
+                phaseText.textContent = 'Live raffle data unavailable';
+                spinBtn.disabled = true;
                 return;
             }
 
@@ -651,35 +653,52 @@
             if (raffleResponse.error) console.warn('Failed to load raffle winners:', raffleResponse.error);
 
             const properties = Array.isArray(propertiesResponse.data) ? propertiesResponse.data : [];
-            const occupiedProperties = properties.filter(row => row.status === 'occupied');
             const bookings = Array.isArray(bookingsResponse.data) ? bookingsResponse.data : [];
             const raffleRows = Array.isArray(raffleResponse.data) ? raffleResponse.data : [];
 
             const bookingLookup = new Map(bookings.map(row => [row.id, row]));
             const propertyLookup = new Map(properties.map(row => [row.id, row]));
-            const bookingsByProperty = new Map();
-
-            bookings.forEach(row => {
-                const arr = bookingsByProperty.get(row.property_id) || [];
-                arr.push(row);
-                bookingsByProperty.set(row.property_id, arr);
-            });
-
-            mockGuests = occupiedProperties
-                .filter(row => row.guest_name)
+            const todayKey = new Date().toISOString().slice(0, 10);
+            const normalizedBookings = bookings
+                .filter(row => row.property_id && row.guest_name)
                 .map(row => {
-                    const propertyBookings = bookingsByProperty.get(row.id) || [];
-                    const matchedBooking = propertyBookings.find(booking => booking.guest_name === row.guest_name) || propertyBookings[0] || null;
+                    const property = propertyLookup.get(row.property_id) || null;
                     return {
                         id: row.id,
-                        location: row.location || row.property_name || 'Booked stay',
-                        propertyName: row.property_name || row.location || 'Booked stay',
-                        guestName: row.guest_name || matchedBooking?.guest_name || 'Guest',
-                        transactionId: matchedBooking?.id || '',
-                        checkIn: matchedBooking?.check_in || '',
-                        checkOut: matchedBooking?.check_out || ''
+                        propertyId: row.property_id,
+                        location: property?.location || row.property_location || row.property_name || 'Booked stay',
+                        propertyName: property?.property_name || row.property_name || property?.location || 'Booked stay',
+                        guestName: row.guest_name || 'Guest',
+                        transactionId: row.id || '',
+                        checkIn: row.check_in || '',
+                        checkOut: row.check_out || '',
+                        bookingDate: row.booking_date || ''
                     };
                 });
+
+            const isActiveBooking = booking => {
+                if (booking.checkIn && booking.checkOut) {
+                    return booking.checkIn <= todayKey && booking.checkOut >= todayKey;
+                }
+                if (booking.checkIn && !booking.checkOut) {
+                    return booking.checkIn <= todayKey;
+                }
+                return booking.bookingDate && booking.bookingDate >= todayKey;
+            };
+
+            const activeBookings = normalizedBookings.filter(isActiveBooking);
+            const sourceBookings = activeBookings.length ? activeBookings : normalizedBookings;
+            const uniqueByProperty = new Map();
+            sourceBookings.forEach(booking => {
+                const existing = uniqueByProperty.get(booking.propertyId);
+                const existingDate = existing?.bookingDate || existing?.checkIn || '';
+                const candidateDate = booking.bookingDate || booking.checkIn || '';
+                if (!existing || candidateDate > existingDate) {
+                    uniqueByProperty.set(booking.propertyId, booking);
+                }
+            });
+
+            mockGuests = Array.from(uniqueByProperty.values());
 
             const currentWeekRows = raffleRows.filter(row => new Date(row.drawn_at) >= currentWeekStart);
             const lastWeekRows = raffleRows.filter(row => {
@@ -723,6 +742,14 @@
                 spinBtn.disabled = true;
                 spinBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Raffle Complete';
                 phaseText.textContent = 'Winner already recorded for this week';
+            } else if (mockGuests.length === 0) {
+                spinBtn.disabled = true;
+                spinBtn.innerHTML = '<i class="fa-solid fa-ban"></i> No Eligible Entries';
+                phaseText.textContent = 'No eligible live bookings found';
+            } else {
+                spinBtn.disabled = false;
+                spinBtn.innerHTML = '<i class="fa-solid fa-building"></i> Spin for Apartment';
+                phaseText.textContent = 'One of our guest in this spinwheel must win a reward!';
             }
         }
 
@@ -858,7 +885,6 @@
 
         function drawWheel(angle) {
             const data = getActiveWheelData();
-            if (data.length === 0) return;
 
             const dpr = window.devicePixelRatio || 1;
             const rect = canvas.parentElement.getBoundingClientRect();
@@ -872,10 +898,31 @@
             const centerX = size / 2;
             const centerY = size / 2;
             const radius = size / 2;
-            const numSegments = data.length;
-            const arcSize = (2 * Math.PI) / numSegments;
 
             ctx.clearRect(0, 0, size, size);
+
+            if (data.length === 0) {
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.beginPath();
+                ctx.fillStyle = '#eef1f5';
+                ctx.arc(0, 0, radius - 2, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.lineWidth = 8;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+                ctx.fillStyle = '#717171';
+                ctx.textAlign = 'center';
+                ctx.font = `600 ${Math.max(14, size * 0.045)}px Poppins`;
+                ctx.fillText('No live raffle entries', 0, -8);
+                ctx.font = `500 ${Math.max(11, size * 0.028)}px Poppins`;
+                ctx.fillText('Check bookings or Friday draw data', 0, 20);
+                ctx.restore();
+                return;
+            }
+
+            const numSegments = data.length;
+            const arcSize = (2 * Math.PI) / numSegments;
 
             ctx.save();
             ctx.translate(centerX, centerY);
