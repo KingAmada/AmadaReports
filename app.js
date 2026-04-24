@@ -996,6 +996,10 @@
             };
         }
 
+        getExclusivePhaseTwoDiscountSeconds() {
+            return 10;
+        }
+
         applyExclusiveTimerState(state) {
             const fallback = this.getDefaultExclusiveTimerState();
             this.exclusiveDiscountPhase = state?.exclusiveDiscountPhase ?? fallback.exclusiveDiscountPhase;
@@ -1011,6 +1015,9 @@
                 const explicitLost = Array.isArray(state?.exclusivePerkLost) ? Boolean(state.exclusivePerkLost[index]) : false;
                 return explicitLost || duration <= 0;
             });
+            if (this.exclusiveDiscountPhase === 2) {
+                this.exclusiveDiscountTimeLeft = Math.min(this.exclusiveDiscountTimeLeft, this.exclusivePerkDurations[0] ?? this.exclusiveDiscountTimeLeft);
+            }
             this.exclusiveBookingConfirmed = Boolean(state?.exclusiveBookingConfirmed);
             this.exclusiveModalTimeLeft = Math.max(...this.exclusivePerkDurations);
         }
@@ -1037,7 +1044,7 @@
                     elapsed -= timeLeft;
                     if (phase === 1) {
                         phase = 2;
-                        timeLeft = 13;
+                        timeLeft = this.getExclusivePhaseTwoDiscountSeconds();
                     } else {
                         phase = 3;
                         timeLeft = 0;
@@ -4075,10 +4082,10 @@
             const renderFlash = () => {
                 if (flashPhase === 'phase1') {
                     flashHeadline.innerText = '50% off if you book within 35 seconds.';
-                    flashDetail.innerText = 'When this ends, the next wave drops to 15% off for 13 seconds.';
+                    flashDetail.innerText = 'When this ends, the next wave drops to 15% off until the first VIP perk expires.';
                     flashCaption.innerText = 'Phase 1 live now';
                 } else {
-                    flashHeadline.innerText = '15% off if you book within 13 seconds.';
+                    flashHeadline.innerText = '15% off if you book within 10 seconds.';
                     flashDetail.innerText = 'Short second-chance burst for guests still deciding.';
                     flashCaption.innerText = 'Phase 2 live now';
                 }
@@ -4091,7 +4098,7 @@
                 if (flashSeconds < 0) {
                     if (flashPhase === 'phase1') {
                         flashPhase = 'phase2';
-                        flashSeconds = 13;
+                        flashSeconds = this.getExclusivePhaseTwoDiscountSeconds();
                     } else {
                         flashPhase = 'phase1';
                         flashSeconds = 35;
@@ -4604,6 +4611,18 @@
             return `You just missed a <span class="text-red-200">${missedOffer}</span> opportunity... Standard rates apply.`;
         }
 
+        updateExclusiveMissedOfferNotice(show = false) {
+            const notice = document.getElementById('guestExclusiveMissedOfferNotice');
+            if (!notice) return;
+            if (!show) {
+                notice.classList.add('hidden');
+                notice.innerHTML = '';
+                return;
+            }
+            notice.innerHTML = this.getExclusiveExpiredOfferMessage();
+            notice.classList.remove('hidden');
+        }
+
         restartExclusiveMasterTimer() {
             const discountEl = document.getElementById('guestExclusiveCountdownTimer');
             const heroVipEl = document.getElementById('guestExclusiveHeroVipTimer');
@@ -4625,6 +4644,7 @@
                 banner.classList.add('urgency-banner-red', 'border-red-900');
                 banner.classList.remove('bg-gray-900', 'bg-black');
                 discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
+                this.updateExclusiveMissedOfferNotice(false);
             } else if (this.exclusiveDiscountPhase === 2) {
                 bannerText.innerHTML = "CHALLENGE FAILED. <span class='text-red-200'>New Offer:</span> Claim 15% OFF in:";
                 discountEl.style.display = '';
@@ -4633,11 +4653,13 @@
                 discountEl.classList.remove('text-amada-red');
                 discountEl.classList.add('text-gray-900');
                 discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
+                this.updateExclusiveMissedOfferNotice(false);
             } else {
                 bannerText.innerHTML = this.getExclusiveExpiredOfferMessage();
                 discountEl.style.display = 'none';
                 banner.classList.remove('urgency-banner-red', 'border-red-900', 'bg-gray-900');
                 banner.classList.add('bg-black');
+                this.updateExclusiveMissedOfferNotice(true);
             }
             heroVipEl.innerText = this.formatExclusiveTime(this.exclusiveHeroVipTimeLeft);
             if (this.exclusiveHeroVipTimeLeft > 0) {
@@ -4660,17 +4682,19 @@
                     this.exclusiveDiscountTimeLeft--;
                 } else if (this.exclusiveDiscountPhase === 1) {
                     this.exclusiveDiscountPhase = 2;
-                    this.exclusiveDiscountTimeLeft = 13;
+                    this.exclusiveDiscountTimeLeft = Math.max(0, this.exclusivePerkDurations[0] ?? this.getExclusivePhaseTwoDiscountSeconds());
                     bannerText.innerHTML = "CHALLENGE FAILED. <span class='text-red-200'>New Offer:</span> Claim 15% OFF in:";
                     banner.classList.remove('urgency-banner-red', 'border-red-900');
                     banner.classList.add('bg-gray-900');
                     discountEl.classList.remove('text-amada-red');
                     discountEl.classList.add('text-gray-900');
+                    this.updateExclusiveMissedOfferNotice(false);
                 } else {
                     bannerText.innerHTML = this.getExclusiveExpiredOfferMessage();
                     discountEl.style.display = 'none';
                     banner.classList.remove('bg-gray-900');
                     banner.classList.add('bg-black');
+                    this.updateExclusiveMissedOfferNotice(true);
                 }
 
                 if (discountEl.style.display !== 'none') {
