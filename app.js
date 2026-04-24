@@ -286,7 +286,7 @@
         registerBookilyServiceWorker();
         setPwaInstallVisibility(false);
         hydrateRaffleGuestCount();
-        switchView('home');
+        switchView(document.body.dataset.initialView || 'home');
     });
 
     let tickSound = null;
@@ -2162,7 +2162,7 @@
             }
 
             this.saveLocalData();
-            this.showNotification(`Profile created successfully! Welcome to Bookily Engine.`, "success");
+            this.showNotification(`Profile created successfully! Welcome to Bookily.`, "success");
             await switchView('portal');
         }
 

@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bookily | List Your Property</title>
+    <meta name="description" content="List your property on Bookily and manage pricing, occupancy, access, and revenue from one host-focused platform.">
+    <meta property="og:title" content="Bookily | List Your Property">
+    <meta property="og:description" content="Register your property, estimate revenue potential, and access your host dashboard on Bookily.">
+    <meta property="og:type" content="website">
+    <meta name="theme-color" content="#FF385C">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Bookily">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>👑</text></svg>">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-192.svg">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Poppins', 'sans-serif'],
+                        serif: ['Playfair Display', 'serif']
+                    },
+                    colors: {
+                        amada: {
+                            red: '#D32F2F',
+                            dark: '#111111',
+                            gold: '#D4AF37',
+                            light: '#FFFFFF',
+                            gray: '#F3F4F6'
+                        }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'slide-in': 'slideIn 0.5s ease-out forwards',
+                        'slide-out': 'slideOut 0.5s ease-in forwards',
+                        'float': 'float 3s ease-in-out infinite',
+                        'shimmer': 'shimmer 2s linear infinite'
+                    },
+                    keyframes: {
+                        slideIn: {
+                            '0%': { transform: 'translateX(-100%)', opacity: '0' },
+                            '100%': { transform: 'translateX(0)', opacity: '1' }
+                        },
+                        slideOut: {
+                            '0%': { transform: 'translateX(0)', opacity: '1' },
+                            '100%': { transform: 'translateX(-100%)', opacity: '0' }
+                        },
+                        float: {
+                            '0%, 100%': { transform: 'translateY(0)' },
+                            '50%': { transform: 'translateY(-10px)' }
+                        },
+                        shimmer: {
+                            '0%': { backgroundPosition: '-200% 0' },
+                            '100%': { backgroundPosition: '200% 0' }
+                        }
+                    }
+                }
+            }
+        };
+    </script>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body[data-initial-view="host"] #hostView {
+            padding-top: 72px;
+            background: #fbfbfb;
+        }
+
+        .host-sales-hero {
+            min-height: calc(100vh - 112px);
+            display: flex;
+            align-items: center;
+            position: relative;
+            color: #fff;
+            overflow: hidden;
+            background:
+                linear-gradient(90deg, rgba(8, 8, 8, 0.92) 0%, rgba(12, 12, 12, 0.72) 45%, rgba(12, 12, 12, 0.18) 100%),
+                url('https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&w=2200&q=80') center/cover;
+        }
+
+        .host-sales-hero::after {
+            content: '';
+            position: absolute;
+            inset: auto 0 0;
+            height: 22%;
+            background: linear-gradient(180deg, transparent, #fbfbfb);
+            pointer-events: none;
+        }
+
+        .host-sales-shell {
+            width: min(1180px, calc(100% - 40px));
+            margin: 0 auto;
+            position: relative;
+            z-index: 1;
+        }
+
+        .host-sales-copy {
+            max-width: 760px;
+            padding: 72px 0 96px;
+        }
+
+        .host-sales-kicker {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.12);
+            border: 1px solid rgba(255,255,255,0.18);
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0;
+            margin-bottom: 20px;
+        }
+
+        .host-sales-copy h1 {
+            font-family: var(--font-heading);
+            font-size: clamp(3.25rem, 7vw, 6.5rem);
+            line-height: 0.95;
+            max-width: 840px;
+            margin-bottom: 22px;
+        }
+
+        .host-sales-copy p {
+            max-width: 660px;
+            color: rgba(255,255,255,0.82);
+            font-size: 1.15rem;
+            line-height: 1.75;
+            margin-bottom: 30px;
+        }
+
+        .host-sales-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-bottom: 32px;
+        }
+
+        .host-sales-actions .btn-outline {
+            color: #fff;
+            border-color: rgba(255,255,255,0.82);
+        }
+
+        .host-sales-actions .btn-outline:hover {
+            background: #fff;
+            color: #111;
+        }
+
+        .host-sales-metrics {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 12px;
+            max-width: 720px;
+        }
+
+        .host-sales-metric {
+            background: rgba(255,255,255,0.11);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 8px;
+            padding: 18px;
+            backdrop-filter: blur(14px);
+        }
+
+        .host-sales-metric strong {
+            display: block;
+            font-size: 1.45rem;
+            font-weight: 900;
+            color: #fff;
+        }
+
+        .host-sales-metric span {
+            display: block;
+            margin-top: 5px;
+            color: rgba(255,255,255,0.72);
+            font-size: 0.86rem;
+            line-height: 1.45;
+        }
+
+        .host-section-tight {
+            padding: 72px 0;
+        }
+
+        .host-sales-heading {
+            max-width: 820px;
+            margin-bottom: 34px;
+        }
+
+        .host-sales-heading.center {
+            text-align: center;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .host-sales-heading span {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--primary);
+            font-size: 0.78rem;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0;
+            margin-bottom: 12px;
+        }
+
+        .host-sales-heading h2 {
+            font-family: var(--font-heading);
+            font-size: clamp(2.25rem, 4vw, 4rem);
+            line-height: 1.02;
+            margin-bottom: 12px;
+            color: #111;
+        }
+
+        .host-sales-heading p {
+            color: var(--gray);
+            line-height: 1.75;
+            font-size: 1rem;
+        }
+
+        .host-problem-grid,
+        .host-system-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 18px;
+        }
+
+        .host-sales-card {
+            background: #fff;
+            border: 1px solid rgba(17,17,17,0.07);
+            border-radius: 8px;
+            padding: 26px;
+            box-shadow: 0 18px 44px rgba(17,17,17,0.06);
+        }
+
+        .host-sales-card i {
+            width: 46px;
+            height: 46px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background: #111;
+            color: #fff;
+            margin-bottom: 18px;
+        }
+
+        .host-sales-card h3 {
+            font-size: 1.18rem;
+            margin-bottom: 10px;
+            color: #111;
+        }
+
+        .host-sales-card p {
+            color: var(--gray);
+            line-height: 1.7;
+            font-size: 0.95rem;
+        }
+
+        .host-command-section {
+            background: #111;
+            color: #fff;
+        }
+
+        .host-command-layout {
+            display: grid;
+            grid-template-columns: 0.9fr 1.1fr;
+            gap: 30px;
+            align-items: center;
+        }
+
+        .host-command-section .host-sales-heading h2,
+        .host-command-section .host-sales-heading p {
+            color: #fff;
+        }
+
+        .host-command-section .host-sales-heading p {
+            color: rgba(255,255,255,0.72);
+        }
+
+        .host-command-panel {
+            background: #fff;
+            color: #111;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 28px 70px rgba(0,0,0,0.32);
+        }
+
+        .host-command-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 18px 20px;
+            background: #f4f4f4;
+            border-bottom: 1px solid #e8e8e8;
+            font-weight: 800;
+        }
+
+        .host-command-body {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 14px;
+            padding: 20px;
+        }
+
+        .host-command-tile {
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 18px;
+            background: #fff;
+        }
+
+        .host-command-tile span {
+            display: block;
+            color: var(--gray);
+            font-size: 0.76rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0;
+            margin-bottom: 8px;
+        }
+
+        .host-command-tile strong {
+            font-size: 1.55rem;
+            font-weight: 900;
+        }
+
+        .host-command-tile p {
+            color: var(--gray);
+            margin-top: 8px;
+            line-height: 1.5;
+            font-size: 0.9rem;
+        }
+
+        .host-estimator-upgrade {
+            background: linear-gradient(180deg, #fff 0%, #f6f8fb 100%);
+        }
+
+        .host-estimator-card {
+            background: #fff;
+            border: 1px solid rgba(17,17,17,0.08);
+            border-radius: 8px;
+            padding: 32px;
+            box-shadow: 0 18px 44px rgba(17,17,17,0.08);
+        }
+
+        .host-estimator-card .calc-result {
+            font-size: clamp(2.4rem, 4vw, 4rem);
+        }
+
+        .host-flow-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 16px;
+        }
+
+        .host-flow-card strong {
+            display: inline-flex;
+            width: 42px;
+            height: 42px;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary);
+            color: #fff;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+
+        .host-closer {
+            padding: 76px 0 88px;
+            background:
+                linear-gradient(90deg, rgba(0,0,0,0.88), rgba(0,0,0,0.58)),
+                url('https://images.unsplash.com/photo-1600566753151-384129cf4e3e?auto=format&fit=crop&w=2200&q=80') center/cover;
+            color: #fff;
+        }
+
+        .host-closer-box {
+            max-width: 860px;
+        }
+
+        .host-closer h2 {
+            font-family: var(--font-heading);
+            font-size: clamp(2.8rem, 5vw, 5.5rem);
+            line-height: 0.98;
+            margin-bottom: 18px;
+        }
+
+        .host-closer p {
+            max-width: 650px;
+            color: rgba(255,255,255,0.78);
+            line-height: 1.75;
+            font-size: 1.05rem;
+            margin-bottom: 26px;
+        }
+
+        @media (max-width: 980px) {
+            .host-sales-metrics,
+            .host-problem-grid,
+            .host-system-grid,
+            .host-command-layout,
+            .host-flow-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .host-command-body {
+                grid-template-columns: 1fr;
+            }
+
+            .host-sales-hero {
+                min-height: auto;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .host-sales-shell {
+                width: min(100% - 28px, 1180px);
+            }
+
+            .host-sales-copy {
+                padding: 54px 0 86px;
+            }
+
+            .host-sales-actions .btn-primary,
+            .host-sales-actions .btn-outline {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .host-section-tight,
+            .host-closer {
+                padding: 54px 0;
+            }
+        }
+    </style>
+</head>
+<body data-initial-view="host">
+    <div class="urgency-banner" id="topBanner">
+        <div class="pulse-dot"></div>
+        Premium host onboarding is open. Register your property and estimate revenue in minutes.
+    </div>
+
+    <header id="mainHeader">
+        <div class="nav-container">
+            <a href="./index.html" class="brand"><i class="fa-solid fa-crown"></i> Bookily</a>
+            <div class="nav-links">
+                <a href="./index.html">Find a Stay</a>
+                <a href="./host.html">List Your Property</a>
+                <a href="./raffle.html">Raffle Draw</a>
+                <button id="installAppButton" class="btn-outline install-app-button" onclick="promptPwaInstall()" hidden><i class="fa-solid fa-download"></i> Install App</button>
+                <button class="btn-outline" onclick="openLoginModal()"><i class="fa-solid fa-lock"></i> Host Login</button>
+                <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Become a Host</button>
+            </div>
+        </div>
+    </header>
+
+    <main id="homeView" style="display:none;"></main>
+
+    <main id="hostView">
+        <section class="host-sales-hero">
+            <div class="host-sales-shell">
+                <div class="host-sales-copy">
+                    <span class="host-sales-kicker"><i class="fa-solid fa-building-circle-check"></i> Built for serious shortlet owners</span>
+                    <h1>Turn your apartment into a booked, tracked, revenue machine.</h1>
+                    <p>Bookily gives hosts the booking engine, guest pipeline, pricing control, access flow, receipts, reporting, and reward system needed to stop managing shortlets by guesswork.</p>
+                    <div class="host-sales-actions">
+                        <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Register My Property</button>
+                        <a class="btn-outline" href="#hostRevenueEstimator" style="text-decoration:none;"><i class="fa-solid fa-calculator"></i> Estimate My Revenue</a>
+                    </div>
+                    <div class="host-sales-metrics">
+                        <div class="host-sales-metric"><strong>45+</strong><span>premium units already structured for bookings</span></div>
+                        <div class="host-sales-metric"><strong>₦850M+</strong><span>booking value handled through the platform model</span></div>
+                        <div class="host-sales-metric"><strong>40%</strong><span>potential upside when pricing and occupancy are actively managed</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="host-section-tight">
+            <div class="host-sales-shell">
+                <div class="host-sales-heading center">
+                    <span><i class="fa-solid fa-triangle-exclamation"></i> The real host problem</span>
+                    <h2>A good apartment can still lose money when the system around it is weak.</h2>
+                    <p>Most owners do not need another random listing. They need pricing discipline, faster guest conversion, cleaner operations, and a dashboard that shows what is actually happening.</p>
+                </div>
+                <div class="host-problem-grid">
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-calendar-xmark"></i>
+                        <h3>Empty nights keep eating profit</h3>
+                        <p>Flat rates, slow follow-up, and poor visibility leave valuable dates unused while demand moves elsewhere.</p>
+                    </article>
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-money-bill-trend-up"></i>
+                        <h3>Busy dates get sold too cheaply</h3>
+                        <p>When pricing is not adjusted around demand, premium units leave money on the table even when bookings come in.</p>
+                    </article>
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-comments"></i>
+                        <h3>Operations become scattered</h3>
+                        <p>Guest chats, access codes, receipts, refunds, and staff updates become hard to track when they live in different places.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="host-command-section host-section-tight">
+            <div class="host-sales-shell host-command-layout">
+                <div class="host-sales-heading">
+                    <span><i class="fa-solid fa-gauge-high"></i> What Bookily gives hosts</span>
+                    <h2>One operating engine for bookings, control, and repeat demand.</h2>
+                    <p>Hosts get more than a public listing. Bookily connects guest discovery, reservation flow, occupancy tracking, payment records, receipts, role access, property control, and raffle rewards that keep guests coming back.</p>
+                    <div class="host-sales-actions">
+                        <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-file-signature"></i> Start Host Registration</button>
+                    </div>
+                </div>
+                <div class="host-command-panel" aria-label="Host dashboard preview">
+                    <div class="host-command-top">
+                        <span><i class="fa-solid fa-crown"></i> Bookily Host Control</span>
+                        <span style="color:var(--success); font-size:0.85rem;"><i class="fa-solid fa-circle"></i> Live</span>
+                    </div>
+                    <div class="host-command-body">
+                        <div class="host-command-tile"><span>Occupancy</span><strong>18 / 25</strong><p>Booked and available units visible at a glance.</p></div>
+                        <div class="host-command-tile"><span>Revenue</span><strong>₦2.25M</strong><p>Monthly projection tied to location and nights sold.</p></div>
+                        <div class="host-command-tile"><span>Access</span><strong>Smart Codes</strong><p>Booking-linked access details and guest records.</p></div>
+                        <div class="host-command-tile"><span>Retention</span><strong>Lucky 7</strong><p>Weekly rewards help turn guests into repeat guests.</p></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="host-section-tight">
+            <div class="host-sales-shell">
+                <div class="host-sales-heading center">
+                    <span><i class="fa-solid fa-bolt"></i> Platform power</span>
+                    <h2>Everything a host needs after the listing goes live.</h2>
+                </div>
+                <div class="host-system-grid">
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-house-laptop"></i>
+                        <h3>Premium guest marketplace</h3>
+                        <p>Your unit appears inside a booking experience built to convert guests with search, filters, property details, perks, and direct reservation flow.</p>
+                    </article>
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-key"></i>
+                        <h3>Guest access workflow</h3>
+                        <p>Bookings can carry guest details, access records, receipts, and stay data so operations do not depend on memory or chat history.</p>
+                    </article>
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-chart-pie"></i>
+                        <h3>Revenue and occupancy visibility</h3>
+                        <p>Hosts and managers can see unit status, revenue movement, performance reports, and where money is coming from.</p>
+                    </article>
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-users-gear"></i>
+                        <h3>Staff and management control</h3>
+                        <p>Role-based access keeps staff, management, and executive views organized without exposing every control to every person.</p>
+                    </article>
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-receipt"></i>
+                        <h3>Receipts, refunds, and records</h3>
+                        <p>Bookings, payments, refunds, caution fees, and receipts are structured for cleaner accountability.</p>
+                    </article>
+                    <article class="host-sales-card">
+                        <i class="fa-solid fa-gift"></i>
+                        <h3>Reward engine for repeat bookings</h3>
+                        <p>Guest perks, spins, and weekly raffle moments give guests a reason to book directly again instead of disappearing after one stay.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section id="hostRevenueEstimator" class="host-section-tight host-estimator-upgrade">
+            <div class="host-sales-shell host-command-layout">
+                <div class="host-sales-heading">
+                    <span><i class="fa-solid fa-calculator"></i> Revenue estimator</span>
+                    <h2>See what active occupancy can mean before you hand over the unit.</h2>
+                    <p>Move the nights slider and compare the upside of a properly managed short-stay unit against passive rent thinking.</p>
+                    <div class="host-sales-actions">
+                        <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Register After Estimate</button>
+                    </div>
+                </div>
+                <div class="host-estimator-card">
+                    <h3 style="font-size:1.5rem; margin-bottom:10px;">Estimate Your Earnings</h3>
+                    <p style="color:var(--gray); font-size:0.95rem;">Use a realistic occupancy assumption and see what your property could return monthly.</p>
+                    <div class="slider-container">
+                        <label style="font-weight:600;">Property Location</label>
+                        <select id="calcLoc" class="input-floating" style="width:100%; padding:15px; margin-top:10px; border:1px solid #ddd; border-radius:8px;" onchange="updateCalc()">
+                            <option value="150000">Jahi / Gwarinpa (Standard)</option>
+                            <option value="250000">Katampe / Maitama (Premium)</option>
+                            <option value="350000">Asokoro (Ultra Luxury)</option>
+                        </select>
+                    </div>
+                    <div class="slider-container">
+                        <div style="display:flex; justify-content:space-between; font-weight:600;">
+                            <label>Estimated Occupancy</label>
+                            <span id="occValue">15 nights/mo</span>
+                        </div>
+                        <input type="range" id="calcOcc" class="range-slider" min="5" max="30" value="15" oninput="updateCalc()">
+                    </div>
+                    <div style="margin-top:34px; text-align:center; padding-top:22px; border-top:1px dashed #ddd;">
+                        <p style="color:var(--gray); font-weight:700;">Projected Monthly Revenue</p>
+                        <div class="calc-result" id="calcResult">₦2,250,000</div>
+                        <p style="font-size:0.86rem; color:var(--success);"><i class="fa-solid fa-arrow-trend-up"></i> Shows upside when pricing and bookings are actively managed.</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="host-section-tight">
+            <div class="host-sales-shell">
+                <div class="host-sales-heading center">
+                    <span><i class="fa-solid fa-route"></i> Fast onboarding</span>
+                    <h2>Register now. Let the property enter a system built to sell it.</h2>
+                </div>
+                <div class="host-flow-grid">
+                    <article class="host-sales-card host-flow-card">
+                        <strong>01</strong>
+                        <h3>Create host profile</h3>
+                        <p>Submit your host details so your account can be prepared for property setup and dashboard access.</p>
+                    </article>
+                    <article class="host-sales-card host-flow-card">
+                        <strong>02</strong>
+                        <h3>Add property details</h3>
+                        <p>Location, price, type, amenities, images, and map coordinates become part of the live inventory flow.</p>
+                    </article>
+                    <article class="host-sales-card host-flow-card">
+                        <strong>03</strong>
+                        <h3>Go live for guests</h3>
+                        <p>Your unit enters the booking experience with search, filters, details, and direct reservation actions.</p>
+                    </article>
+                    <article class="host-sales-card host-flow-card">
+                        <strong>04</strong>
+                        <h3>Track and improve</h3>
+                        <p>Occupancy, revenue, bookings, receipts, refunds, and operations become visible from the control panel.</p>
+                    </article>
+                </div>
+            </div>
+        </section>
+
+        <section class="host-closer">
+            <div class="host-sales-shell">
+                <div class="host-closer-box">
+                    <h2>Your unit is too valuable to be managed casually.</h2>
+                    <p>Put it where guests can book, where operations can be tracked, and where revenue is visible enough to improve. Start with the host profile and move the property into Bookily.</p>
+                    <div class="host-sales-actions">
+                        <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-file-signature"></i> Register My Property Now</button>
+                        <a class="btn-outline" href="./index.html" style="text-decoration:none;"><i class="fa-solid fa-arrow-left"></i> Back To Bookily</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <main id="guestView" style="display:none;"></main>
+
+    <main id="portalView" style="display:none;">
+        <div class="portal-header">
+            <div style="font-weight:700; font-size:1.2rem; color:var(--dark);"><i class="fa-solid fa-gauge-high" style="color:var(--primary)"></i> Control Panel</div>
+            <div class="role-toggle" id="staffRoleToggle">
+                <button id="btnHost" class="role-btn" onclick="app.requestRole('host')" style="display:none;"><i class="fa-solid fa-house-user"></i> Host</button>
+                <button id="btnStaff" class="role-btn active" onclick="app.requestRole('staff')"><i class="fa-solid fa-bell-concierge"></i> Staff</button>
+                <button id="btnMgmt" class="role-btn" onclick="app.requestRole('management')"><i class="fa-solid fa-briefcase"></i> Management</button>
+                <button id="btnChair" class="role-btn" onclick="app.requestRole('chairman')"><i class="fa-solid fa-user-tie"></i> Executive</button>
+            </div>
+            <div style="display:flex; gap:15px; align-items:center;">
+                <div class="sync-indicator">
+                    <div id="syncDot" class="sync-dot online"></div>
+                    <span id="syncStatus">Engine Live</span>
+                </div>
+                <button class="btn-outline" style="padding: 8px 15px; font-size:0.8rem;" onclick="window.location.href='./index.html'">Exit</button>
+            </div>
+        </div>
+        <div id="appContainer" class="dashboard-container"></div>
+    </main>
+
+    <div id="loginModal" class="modal">
+        <div class="modal-content" style="max-width:400px;">
+            <button class="close-modal" onclick="closeModals()"><i class="fa-solid fa-times"></i></button>
+            <h2 style="font-family:var(--font-heading); margin-bottom:10px; text-align:center;">Host Access</h2>
+            <div style="display:flex; gap:10px; margin-bottom:20px; border-bottom:1px solid #eee; padding-bottom:10px;">
+                <button class="w-tab active" style="flex:1; border:none; background:none; font-size:1rem;" onclick="toggleLoginType('host')" id="tabLoginHost">Host Login</button>
+                <button class="w-tab" style="flex:1; border:none; background:none; font-size:1rem; color:var(--gray);" onclick="toggleLoginType('staff')" id="tabLoginStaff">Team Access</button>
+            </div>
+            <form id="hostLoginForm" onsubmit="event.preventDefault(); submitLogin();">
+                <div id="hostLoginFields">
+                    <div class="input-floating"><input type="email" id="loginEmail" required><label>Email Address</label></div>
+                    <div class="input-floating"><input type="password" id="loginPass" required><label>Password</label></div>
+                </div>
+                <div id="staffLoginFields" style="display:none;">
+                    <div class="input-floating"><input type="tel" id="loginStaffId" maxlength="11" pattern="[0-9]{11}" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)"><label>Team Phone Number</label></div>
+                    <div class="input-floating"><input type="password" id="loginPin" placeholder="••••" style="text-align:center; font-size:2rem; letter-spacing:15px; padding:15px;"><label>Team Password / PIN</label></div>
+                </div>
+                <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:15px;">Authorize Access</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="hostModal" class="modal">
+        <div class="modal-content">
+            <button class="close-modal" onclick="closeModals()"><i class="fa-solid fa-times"></i></button>
+            <h2 style="font-family:var(--font-heading); margin-bottom:10px;">Create Host Profile</h2>
+            <p style="color:var(--gray); font-size:0.9rem; margin-bottom:25px;">Register to join the exclusive network, set up your property, and access your management dashboard.</p>
+            <form id="hostForm" onsubmit="event.preventDefault(); registerHost();">
+                <div class="input-floating">
+                    <input type="text" id="hostFullName" required minlength="3">
+                    <label>Full Name</label>
+                </div>
+                <div class="input-floating">
+                    <input type="email" id="hostEmail" required>
+                    <label>Email Address</label>
+                </div>
+                <div class="input-floating">
+                    <input type="tel" id="hostPhone" required maxlength="11" pattern="[0-9]{11}" title="Please enter exactly 11 digits" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 11)">
+                    <label>Phone Number (11 digits)</label>
+                </div>
+                <div class="input-floating">
+                    <input type="password" id="hostPassword" required minlength="6">
+                    <label>Create Password</label>
+                </div>
+                <label style="display:flex; align-items:flex-start; gap:10px; margin-bottom:22px; font-size:0.9rem; color:var(--gray); line-height:1.5;">
+                    <input type="checkbox" id="hostConsent" required style="margin-top:4px; accent-color: var(--primary);">
+                    <span>I agree to the <a href="#" onclick="openLegalModal('terms'); return false;" style="color:var(--primary); font-weight:600;">Terms and Conditions</a> and <a href="#" onclick="openLegalModal('privacy'); return false;" style="color:var(--primary); font-weight:600;">Privacy Statement</a> for creating a host account on Bookily Stays.</span>
+                </label>
+                <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:15px;" id="hostSubmitBtn">Complete Registration</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="legalModal" class="modal">
+        <div class="modal-content" style="max-width:720px; max-height:85vh; overflow-y:auto;">
+            <button class="close-modal" onclick="closeModals()"><i class="fa-solid fa-times"></i></button>
+            <h2 id="legalModalTitle" style="font-family:var(--font-heading); margin-bottom:14px;">Legal</h2>
+            <div id="legalModalBody" style="color:var(--gray); line-height:1.75; font-size:0.95rem;"></div>
+        </div>
+    </div>
+
+    <div id="notification-container"></div>
+    <div id="social-proof-container"></div>
+    <div id="pwaInstallPrompt" class="pwa-install-prompt" hidden>
+        <div class="pwa-install-copy">
+            <strong>Install Bookily</strong>
+            <span>Save it to your home screen for faster booking and offline access.</span>
+        </div>
+        <div class="pwa-install-actions">
+            <button type="button" class="btn-primary" onclick="promptPwaInstall()"><i class="fa-solid fa-download"></i> Install</button>
+            <button type="button" class="btn-outline" onclick="dismissPwaInstallPrompt()">Not now</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -97,10 +97,10 @@
     <!-- MAIN HEADER -->
     <header id="mainHeader">
         <div class="nav-container">
-            <a href="#" class="brand" onclick="switchView('home'); return false;"><i class="fa-solid fa-crown"></i> Bookily <span>Engine</span></a>
+            <a href="#" class="brand" onclick="switchView('home'); return false;"><i class="fa-solid fa-crown"></i> Bookily</a>
             <div class="nav-links">
                 <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
-                <a href="#" onclick="switchView('host'); return false;">List Your Property</a>
+                <a href="./host.html">List Your Property</a>
                 <a href="./raffle.html">Raffle Draw</a>
                 <button class="btn-outline" onclick="openGuestAccessModal()"><i class="fa-solid fa-key"></i> Guest Login</button>
                 <button id="installAppButton" class="btn-outline install-app-button" onclick="promptPwaInstall()" hidden><i class="fa-solid fa-download"></i> Install App</button>
@@ -123,7 +123,7 @@
                     <p>The elite property management engine and booking platform. Guests find their perfect stay; Owners put their revenue on autopilot.</p>
                     <div style="display: flex; gap: 15px; margin-top: 20px;">
                         <button class="btn-primary" style="padding: 15px 35px; font-size: 1.1rem;" onclick="document.getElementById('searchLoc').focus()">Book a Stay</button>
-                        <button class="btn-outline" style="border-color: white; color: white;" onclick="switchView('host')">Maximize Yield</button>
+                        <a class="btn-outline" style="border-color: white; color: white; text-decoration:none;" href="./host.html">Maximize Yield</a>
                     </div>
                 </div>
 
@@ -190,7 +190,7 @@
                 <h2 style="font-family: var(--font-heading); font-size: 3rem; color: #FFD700; margin-bottom: 10px;">The Bookily Gold Raffle</h2>
                 <p style="font-size: 1.2rem; color: rgba(255,255,255,0.9); margin-bottom: 30px;">Stay with us. Win with us.</p>
                 <div style="font-size: 1.1rem; color: #ddd; margin-bottom: 30px; line-height: 1.6;">
-                    Every verified booking on the Bookily Engine automatically enters you into our exclusive draws. 
+                    Every verified booking on Bookily automatically enters you into our exclusive draws. 
                     <br><strong style="color: white; font-size: 1.2rem;">🌟 Every Friday: One lucky guest wins a 100% REFUND!</strong>
                     <br><strong style="color: #FFD700; font-size: 1.1rem;">🏠 Full House Days: When we hit 100% occupancy, a random guest wins 25% OFF!</strong>
                 </div>
@@ -629,7 +629,7 @@
             <footer class="guest-footer">
                 <div class="guest-footer-shell">
                     <div class="guest-footer-brand">
-                        <div class="guest-footer-logo"><i class="fa-solid fa-crown"></i> Bookily Engine</div>
+                        <div class="guest-footer-logo"><i class="fa-solid fa-crown"></i> Bookily</div>
                         <p>Premium stays, verified host operations, guest access control, and modern booking workflows in one professional engine.</p>
                         <div class="guest-footer-badges">
                             <span><i class="fa-solid fa-shield-halved"></i> Verified Inventory</span>
@@ -641,14 +641,14 @@
                         <div>
                             <h4>Explore</h4>
                             <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
-                            <a href="#" onclick="switchView('host'); return false;">List Your Property</a>
+                            <a href="./host.html">List Your Property</a>
                             <a href="#" onclick="openGuestAccessModal(); return false;">Guest Login</a>
                         </div>
                         <div>
                             <h4>Host</h4>
                             <a href="#" onclick="openLoginModal(); return false;">Host Login</a>
                             <a href="#" onclick="openHostModal(); return false;">Register Property</a>
-                            <a href="#" onclick="switchView('host'); return false;">Revenue Estimator</a>
+                            <a href="./host.html#hostRevenueEstimator">Revenue Estimator</a>
                         </div>
                         <div>
                             <h4>Trust</h4>
@@ -659,7 +659,7 @@
                     </div>
                 </div>
                 <div class="guest-footer-bottom">
-                    <span>&copy; 2026 Bookily Engine. All rights reserved.</span>
+                    <span>&copy; 2026 Bookily. All rights reserved.</span>
                     <div>
                         <span><i class="fa-brands fa-cc-visa"></i></span>
                         <span><i class="fa-brands fa-cc-mastercard"></i></span>
