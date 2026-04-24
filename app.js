@@ -173,49 +173,53 @@
         return `${mins}:${secs}`;
     }
 
+    function getCurrentRafflePeriodStartMs(referenceDate = new Date()) {
+        const start = new Date(referenceDate);
+        const daysSinceFriday = (start.getDay() + 2) % 7;
+        start.setDate(start.getDate() - daysSinceFriday);
+        start.setHours(17, 0, 0, 0);
+        if (referenceDate.getTime() < start.getTime()) {
+            start.setDate(start.getDate() - 7);
+        }
+        return start.getTime();
+    }
+
+    function updateRaffleGuestCountDisplay(count) {
+        const countEl = document.getElementById('guestRaffleCount');
+        if (!countEl) return;
+        countEl.innerText = Math.max(0, Number(count) || 0).toLocaleString();
+    }
+
     function hydrateRaffleGuestCount() {
         const countEl = document.getElementById('guestRaffleCount');
         if (!countEl) return;
 
         const storageKey = 'bookily-raffle-guest-count';
         const now = Date.now();
-        const dayMs = 24 * 60 * 60 * 1000;
-        const minGapMs = 4 * 60 * 60 * 1000;
-        const maxGapMs = 12 * 60 * 60 * 1000;
+        const periodStartAt = getCurrentRafflePeriodStartMs(new Date(now));
 
         let state = {
-            count: 13,
-            lastUpdatedAt: now,
-            nextUpdateAt: now + (6 * 60 * 60 * 1000)
+            count: 0,
+            periodStartAt
         };
 
         try {
             const raw = localStorage.getItem(storageKey);
             if (raw) {
                 const parsed = JSON.parse(raw);
-                state.count = Math.max(13, Number(parsed.count) || 13);
-                state.lastUpdatedAt = Number(parsed.lastUpdatedAt) || now;
-                state.nextUpdateAt = Number(parsed.nextUpdateAt) || (state.lastUpdatedAt + (6 * 60 * 60 * 1000));
+                state.count = Math.max(0, Number(parsed.count) || 0);
+                state.periodStartAt = Number(parsed.periodStartAt) || periodStartAt;
             }
         } catch {}
 
-        if (now - state.lastUpdatedAt > dayMs * 14) {
+        if (state.periodStartAt !== periodStartAt) {
             state = {
-                count: 13,
-                lastUpdatedAt: now,
-                nextUpdateAt: now + (6 * 60 * 60 * 1000)
+                count: 0,
+                periodStartAt
             };
         }
 
-        let writes = 0;
-        while (now >= state.nextUpdateAt && writes < 6) {
-            state.count += Math.floor(Math.random() * 5) + 2;
-            state.lastUpdatedAt = state.nextUpdateAt;
-            state.nextUpdateAt += (Math.floor(Math.random() * ((maxGapMs - minGapMs) / (60 * 60 * 1000) + 1)) + 4) * 60 * 60 * 1000;
-            writes++;
-        }
-
-        countEl.innerText = state.count.toLocaleString();
+        updateRaffleGuestCountDisplay(state.count);
 
         try {
             localStorage.setItem(storageKey, JSON.stringify(state));
@@ -225,7 +229,12 @@
     let deferredPwaInstallPrompt = null;
     let pwaInstallDismissed = false;
 
+    function isPwaInstallDisabledOnPage() {
+        return document.body?.dataset.disablePwaInstall === 'true';
+    }
+
     function setPwaInstallVisibility(visible) {
+        if (isPwaInstallDisabledOnPage()) visible = false;
         const headerButton = document.getElementById('installAppButton');
         const floatingPrompt = document.getElementById('pwaInstallPrompt');
         const canShow = visible && !pwaInstallDismissed;
@@ -239,6 +248,7 @@
     }
 
     async function promptPwaInstall() {
+        if (isPwaInstallDisabledOnPage()) return;
         if (!deferredPwaInstallPrompt) {
             if (window.app?.showNotification) {
                 window.app.showNotification('Install is available when your browser offers the app prompt. If you are on iPhone, use Share > Add to Home Screen.', 'info');
@@ -268,6 +278,7 @@
     }
 
     window.addEventListener('beforeinstallprompt', event => {
+        if (isPwaInstallDisabledOnPage()) return;
         event.preventDefault();
         deferredPwaInstallPrompt = event;
         pwaInstallDismissed = false;
@@ -525,7 +536,7 @@
             this.exclusiveToastLocations = ["Maitama", "Wuse 2", "Asokoro", "Gwarinpa", "Katampe", "Lagos"];
             this.exclusiveToastActions = ["just booked the Penthouse!", "claimed a Free Massage!", "won a Free Night!", "secured 15% Off!", "got 100% Refunded!", "activated Free Protection!"];
             this.guestLoaderQuotes = [
-                'Every Friday we hold a raffle draw and 10 guests win Free Nights, 100% Refund, 50% off their next booking, Free Lunch, Late Checkout, and more.',
+                'Every Friday we hold a raffle draw and 7 guests win Free Nights, 100% Refund, 50% off their next booking, Free Lunch, Late Checkout, and more.',
                 'Our guests win free nights when they book.',
                 'Our guests win free lunch when they book.',
                 'You might be lucky too and get 50% off.',
@@ -589,6 +600,7 @@
             await this.restoreAuthenticatedSession();
             await this.syncFromCloud();
             this.render();
+            this.updateRaffleGuestCountFromBookings();
             this.handleAuthFeedback(authFeedback);
             if (document.getElementById('guestView')?.style.display === 'block') {
                 this.renderGuestGrid();
@@ -598,6 +610,42 @@
             this.setupPinEnter();
             this.startAutoSlide();
             this.startSocialProofEngine();
+        }
+
+        getTransactionCreatedAtMs(transaction) {
+            const explicitTime = Date.parse(transaction?.createdAt || transaction?.created_at || '');
+            if (!Number.isNaN(explicitTime)) return explicitTime;
+
+            const idMatch = String(transaction?.id || '').match(/^tx_(\d{10,})/);
+            if (idMatch) {
+                const idTime = Number(idMatch[1]);
+                if (Number.isFinite(idTime)) return idTime;
+            }
+
+            const dateOnlyTime = Date.parse(`${transaction?.date || ''}T00:00:00`);
+            return Number.isNaN(dateOnlyTime) ? 0 : dateOnlyTime;
+        }
+
+        getCurrentRaffleBookingCount() {
+            const periodStartAt = getCurrentRafflePeriodStartMs();
+            const seen = new Set();
+            return this.transactions.reduce((count, transaction) => {
+                const key = transaction?.id || `${transaction?.propId || ''}-${transaction?.guest || ''}-${transaction?.date || ''}`;
+                if (!key || seen.has(key)) return count;
+                const createdAt = this.getTransactionCreatedAtMs(transaction);
+                if (createdAt < periodStartAt) return count;
+                seen.add(key);
+                return count + 1;
+            }, 0);
+        }
+
+        updateRaffleGuestCountFromBookings() {
+            const periodStartAt = getCurrentRafflePeriodStartMs();
+            const count = this.getCurrentRaffleBookingCount();
+            updateRaffleGuestCountDisplay(count);
+            try {
+                localStorage.setItem('bookily-raffle-guest-count', JSON.stringify({ count, periodStartAt }));
+            } catch {}
         }
 
         startSocialProofEngine() {
@@ -3704,6 +3752,7 @@
                 accessCode: row.access_code || '',
                 checkIn: row.check_in || '',
                 checkOut: row.check_out || '',
+                createdAt: row.created_at || '',
                 reward: row.reward ? { label: row.reward, detail: row.reward_detail || '' } : null
             };
         }
@@ -5141,7 +5190,8 @@
                 checkIn,
                 checkOut,
                 propertyName: property.name,
-                propertyLocation: property.loc
+                propertyLocation: property.loc,
+                createdAt: new Date().toISOString()
             };
             const cloudSaved = await this.saveGuestBookingToCloud(transaction).catch(() => false);
             if (!cloudSaved) {
@@ -5157,6 +5207,7 @@
             }
 
             this.transactions = [transaction, ...this.transactions.filter(item => item.id !== transaction.id)];
+            this.updateRaffleGuestCountFromBookings();
             this.exclusivePendingTransactionId = transaction.id;
             this.exclusiveBookingConfirmed = true;
             this.saveExclusiveTimerState();
@@ -7700,9 +7751,10 @@
             const transaction = { 
                 id: `tx_${Date.now()}`,
                 date: new Date().toISOString().split('T')[0], 
-                propId: p.id, amount: paid, estimatedTotal, cautionFee, guest: guest, phone: phone, email: email, accessCode: doorCode, checkIn, checkOut
+                propId: p.id, amount: paid, estimatedTotal, cautionFee, guest: guest, phone: phone, email: email, accessCode: doorCode, checkIn, checkOut, createdAt: new Date().toISOString()
             };
             this.transactions.push(transaction);
+            this.updateRaffleGuestCountFromBookings();
 
             this.saveLocalData();
             if (this.activeModalMode === 'guest') {

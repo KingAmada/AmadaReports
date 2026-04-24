@@ -445,7 +445,7 @@
         }
     </style>
 </head>
-<body data-initial-view="host">
+<body data-initial-view="host" data-disable-pwa-install="true">
     <div class="urgency-banner" id="topBanner">
         <div class="pulse-dot"></div>
         Premium host onboarding is open. Register your property and estimate revenue in minutes.
@@ -455,10 +455,7 @@
         <div class="nav-container">
             <a href="./index.html" class="brand"><i class="fa-solid fa-crown"></i> Bookily</a>
             <div class="nav-links">
-                <a href="./index.html">Find a Stay</a>
                 <a href="./host.html">List Your Property</a>
-                <a href="./raffle.html">Raffle Draw</a>
-                <button id="installAppButton" class="btn-outline install-app-button" onclick="promptPwaInstall()" hidden><i class="fa-solid fa-download"></i> Install App</button>
                 <button class="btn-outline" onclick="openLoginModal()"><i class="fa-solid fa-lock"></i> Host Login</button>
                 <button class="btn-primary" onclick="openHostModal()"><i class="fa-solid fa-plus"></i> Become a Host</button>
             </div>
@@ -747,16 +744,6 @@
 
     <div id="notification-container"></div>
     <div id="social-proof-container"></div>
-    <div id="pwaInstallPrompt" class="pwa-install-prompt" hidden>
-        <div class="pwa-install-copy">
-            <strong>Install Bookily</strong>
-            <span>Save it to your home screen for faster booking and offline access.</span>
-        </div>
-        <div class="pwa-install-actions">
-            <button type="button" class="btn-primary" onclick="promptPwaInstall()"><i class="fa-solid fa-download"></i> Install</button>
-            <button type="button" class="btn-outline" onclick="dismissPwaInstallPrompt()">Not now</button>
-        </div>
-    </div>
 
     <script src="app.js"></script>
 </body>
