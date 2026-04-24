@@ -43,15 +43,25 @@
         .page-shell {
             position: relative;
             isolation: isolate;
+            width: min(100%, 1200px);
+            margin: 0 auto;
         }
 
         .top-nav {
-            max-width: 1200px;
-            margin: 0 auto 1rem;
+            width: 100%;
+            margin: 0 0 1rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
             gap: 1rem;
+        }
+
+        .page-shell > header,
+        .page-shell > main {
+            width: 100%;
+            max-width: none;
+            margin-left: 0;
+            margin-right: 0;
         }
 
         .back-link {
@@ -326,7 +336,7 @@
 
                 <h2 class="text-xl md:text-2xl font-bold brand-font text-[#FF385C] mb-2">Weekly Raffle Draw for our Guests</h2>
                 <p class="text-sm md:text-base text-gray-700 mb-1 max-w-3xl mx-auto">
-                    Every Friday we randomly select one of our guests and reward them with a gift
+                    Every Friday we randomly select 7 of our guests and reward them with a gift
                     <br><span class="font-medium">(100% Refund, Free Night, 25% Off, Free Lunch, etc)</span>.
                 </p>
                 <p class="text-xs md:text-sm text-gray-500 font-medium mb-4 italic">
@@ -348,7 +358,7 @@
                     <div class="text-center mb-4 md:mb-6 dim-during-spin w-full" id="spin-header">
                         <h2 class="text-3xl md:text-4xl brand-font font-bold mb-1">Spin to Win!</h2>
                         <div class="inline-block bg-gray-100 px-4 py-1.5 rounded-full mt-2">
-                            <p class="text-gray-600 font-medium text-sm md:text-base"><strong id="current-phase-text" class="text-[#FF385C]">One of our guest in this spinwheel must win a reward!</strong></p>
+                            <p class="text-gray-600 font-medium text-sm md:text-base"><strong id="current-phase-text" class="text-[#FF385C]">One of the 25 apartments on this spinwheel must win a reward!</strong></p>
                         </div>
                     </div>
 
@@ -364,7 +374,7 @@
                         </div>
                     </div>
 
-                    <div class="w-full max-w-sm mt-4 md:mt-6 dim-during-spin px-4 md:px-0">
+                    <div class="w-full max-w-sm mt-4 md:mt-6 dim-during-spin px-4 md:px-0 flex justify-center">
                         <button id="spinBtn" class="btn-primary" onclick="spinWheel()">
                             <i class="fa-solid fa-building"></i> Spin for Apartment
                         </button>
@@ -375,17 +385,17 @@
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-4">
                         <div class="panel border-t-4 border-[#FFB400] flex flex-col h-full">
                             <div class="flex justify-between items-center mb-3">
-                                <h2 class="text-lg font-bold brand-font"><i class="fa-solid fa-trophy text-[#FFB400] mr-2"></i> This Week's Winner</h2>
-                                <span id="winner-count" class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-bold">0 / 1</span>
+                                <h2 class="text-lg font-bold brand-font"><i class="fa-solid fa-trophy text-[#FFB400] mr-2"></i> Lucky 7 Winners</h2>
+                                <span id="winner-count" class="text-xs bg-gray-100 px-2 py-1 rounded-md text-gray-600 font-bold">0 / 7</span>
                             </div>
                             <div id="winners-list" class="space-y-2 flex-1 custom-scroll overflow-y-auto min-h-[100px] max-h-[180px] pr-1">
-                                <div class="text-gray-400 text-sm text-center py-6 italic">No winner yet. Let the games begin!</div>
+                                <div class="text-gray-400 text-sm text-center py-6 italic">No winner yet. Start the Lucky 7 draw.</div>
                             </div>
                         </div>
 
                         <div class="panel bg-gray-900 text-white flex flex-col h-full">
                             <div class="flex justify-between items-center mb-3">
-                                <h2 class="text-lg font-bold brand-font text-white"><i class="fa-solid fa-list-check text-[#00A699] mr-2"></i> Eligible Stays</h2>
+                                <h2 class="text-lg font-bold brand-font text-white"><i class="fa-solid fa-list-check text-[#00A699] mr-2"></i> Apartments on Wheel</h2>
                                 <span id="eligible-count" class="bg-gray-800 text-[10px] px-2 py-1 rounded"></span>
                             </div>
                             <div id="eligible-list" class="space-y-1.5 flex-1 custom-scroll overflow-y-auto min-h-[100px] max-h-[180px] pr-1"></div>
@@ -519,9 +529,10 @@
         let isSpinning = false;
         let winners = [];
         let pegs = [];
-        const MAX_WINNERS = 1;
+        const MAX_WINNERS = 7;
         let selectedApartmentObj = null;
         let physicsRafId = null;
+        let apartmentWheelCount = 0;
 
         let mockGuests = [];
         let lastWeekWinners = [];
@@ -548,6 +559,15 @@
         const spinBtn = document.getElementById('spinBtn');
         const overlay = document.getElementById('dynamic-overlay');
         const phaseText = document.getElementById('current-phase-text');
+        const isBookedStatus = status => {
+            const normalizedStatus = String(status || '').toLowerCase();
+            return normalizedStatus === 'occupied' || normalizedStatus === 'booked';
+        };
+        const getApartmentStatusLabel = status => isBookedStatus(status) ? 'Booked' : 'Not Booked';
+        const getApartmentSubtitle = apartment => apartment.occupancyLabel === 'Booked'
+            ? `${apartment.guestName} is staying at:`
+            : 'Selected apartment:';
+        const getApartmentWheelHeadline = () => 'Lucky Number 7: 7 Guests must win a gift this Friday.';
 
         async function init() {
             renderPrizes();
@@ -613,7 +633,7 @@
             const lastWeekListEl = document.getElementById('last-week-list');
 
             if (winnersListEl) winnersListEl.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 italic">Loading live raffle data...</div>';
-            if (eligibleListEl) eligibleListEl.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">Loading occupied stays...</div>';
+            if (eligibleListEl) eligibleListEl.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">Loading apartments...</div>';
             if (lastWeekListEl) lastWeekListEl.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">Loading previous winners...</div>';
 
             if (!supabaseClient) {
@@ -648,13 +668,14 @@
                     .order('drawn_at', { ascending: false })
             ]);
 
-            if (propertiesResponse.error) console.warn('Failed to load occupied properties:', propertiesResponse.error);
+            if (propertiesResponse.error) console.warn('Failed to load properties:', propertiesResponse.error);
             if (bookingsResponse.error) console.warn('Failed to load bookings:', bookingsResponse.error);
             if (raffleResponse.error) console.warn('Failed to load raffle winners:', raffleResponse.error);
 
             const properties = Array.isArray(propertiesResponse.data) ? propertiesResponse.data : [];
             const bookings = Array.isArray(bookingsResponse.data) ? bookingsResponse.data : [];
             const raffleRows = Array.isArray(raffleResponse.data) ? raffleResponse.data : [];
+            apartmentWheelCount = properties.length;
 
             const bookingLookup = new Map(bookings.map(row => [row.id, row]));
             const propertyLookup = new Map(properties.map(row => [row.id, row]));
@@ -688,17 +709,29 @@
 
             const activeBookings = normalizedBookings.filter(isActiveBooking);
             const sourceBookings = activeBookings.length ? activeBookings : normalizedBookings;
-            const uniqueByProperty = new Map();
+            const latestBookingByProperty = new Map();
             sourceBookings.forEach(booking => {
-                const existing = uniqueByProperty.get(booking.propertyId);
+                const existing = latestBookingByProperty.get(booking.propertyId);
                 const existingDate = existing?.bookingDate || existing?.checkIn || '';
                 const candidateDate = booking.bookingDate || booking.checkIn || '';
                 if (!existing || candidateDate > existingDate) {
-                    uniqueByProperty.set(booking.propertyId, booking);
+                    latestBookingByProperty.set(booking.propertyId, booking);
                 }
             });
 
-            mockGuests = Array.from(uniqueByProperty.values());
+            mockGuests = properties.map(row => {
+                const linkedBooking = latestBookingByProperty.get(row.id) || null;
+                const occupancyLabel = getApartmentStatusLabel(row.status);
+                return {
+                    propertyId: row.id,
+                    location: row.location || 'Apartment',
+                    propertyName: row.property_name || row.location || 'Apartment',
+                    guestName: linkedBooking?.guestName || row.guest_name || 'No Guest',
+                    transactionId: linkedBooking?.transactionId || '',
+                    occupancyLabel,
+                    wheelLabel: `${row.property_name || row.location || 'Apartment'} (${occupancyLabel})`
+                };
+            });
 
             const currentWeekRows = raffleRows.filter(row => new Date(row.drawn_at) >= currentWeekStart);
             const lastWeekRows = raffleRows.filter(row => {
@@ -712,10 +745,12 @@
                 return {
                     id: row.id,
                     guest: {
+                        propertyId: booking?.property_id || null,
                         location: property?.location || booking?.property_location || booking?.property_name || 'Booked stay',
                         propertyName: property?.property_name || booking?.property_name || property?.location || 'Booked stay',
                         guestName: row.guest_name || booking?.guest_name || 'Guest',
-                        transactionId: row.booking_id || ''
+                        transactionId: row.booking_id || '',
+                        occupancyLabel: property ? getApartmentStatusLabel(property.status) : 'Booked'
                     },
                     prize: {
                         name: row.prize || 'Raffle Reward',
@@ -734,22 +769,23 @@
                 };
             });
 
+            const currentWinnerPropertyIds = new Set(winners.map(entry => entry.guest.propertyId).filter(Boolean));
             const currentWinnerBookingIds = new Set(winners.map(entry => entry.guest.transactionId).filter(Boolean));
             const currentWinnerGuests = new Set(winners.map(entry => entry.guest.guestName).filter(Boolean));
-            mockGuests = mockGuests.filter(guest => !currentWinnerBookingIds.has(guest.transactionId) && !currentWinnerGuests.has(guest.guestName));
+            mockGuests = mockGuests.filter(guest => !currentWinnerPropertyIds.has(guest.propertyId) && !currentWinnerBookingIds.has(guest.transactionId) && !currentWinnerGuests.has(guest.guestName));
 
             if (winners.length >= MAX_WINNERS) {
                 spinBtn.disabled = true;
-                spinBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Raffle Complete';
-                phaseText.textContent = 'Winner already recorded for this week';
+                spinBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Lucky 7 Complete';
+                phaseText.textContent = 'Lucky 7 draw already completed for this week';
             } else if (mockGuests.length === 0) {
                 spinBtn.disabled = true;
-                spinBtn.innerHTML = '<i class="fa-solid fa-ban"></i> No Eligible Entries';
-                phaseText.textContent = 'No eligible live bookings found';
+                spinBtn.innerHTML = '<i class="fa-solid fa-ban"></i> No Apartments Available';
+                phaseText.textContent = 'No apartments found for the wheel';
             } else {
                 spinBtn.disabled = false;
                 spinBtn.innerHTML = '<i class="fa-solid fa-building"></i> Spin for Apartment';
-                phaseText.textContent = 'One of our guest in this spinwheel must win a reward!';
+                phaseText.textContent = getApartmentWheelHeadline();
             }
         }
 
@@ -757,7 +793,9 @@
             if (!supabaseClient) return false;
 
             const payload = {
-                guest_name: winnerEntry.guest.guestName || 'Guest',
+                guest_name: winnerEntry.guest.occupancyLabel === 'Booked'
+                    ? (winnerEntry.guest.guestName || winnerEntry.guest.propertyName || 'Guest')
+                    : (winnerEntry.guest.propertyName || 'Apartment'),
                 prize: winnerEntry.prize.name || 'Raffle Reward',
                 booking_id: winnerEntry.guest.transactionId || null,
                 drawn_at: new Date().toISOString()
@@ -798,7 +836,7 @@
             const container = document.getElementById('eligible-list');
             document.getElementById('eligible-count').textContent = mockGuests.length + ' Remaining';
             if (mockGuests.length === 0) {
-                container.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">No eligible occupied stays found in the database.</div>';
+                container.innerHTML = '<div class="text-gray-400 text-xs italic py-2 text-center">No apartments found in the database.</div>';
                 return;
             }
 
@@ -807,7 +845,7 @@
                     <div class="w-5 h-5 rounded bg-gray-800 flex items-center justify-center flex-shrink-0">
                         <i class="fa-solid fa-door-closed text-gray-400 text-[10px]"></i>
                     </div>
-                    <span class="text-xs font-medium text-gray-300 truncate">${g.guestName} in ${g.location}</span>
+                    <span class="text-xs font-medium text-gray-300 truncate">${g.propertyName} • ${g.occupancyLabel}</span>
                 </div>
             `).join('');
         }
@@ -816,7 +854,7 @@
             const container = document.getElementById('winners-list');
             document.getElementById('winner-count').textContent = `${winners.length} / ${MAX_WINNERS}`;
             if (winners.length === 0) {
-                container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 italic">No winner yet. Let the games begin!</div>';
+                container.innerHTML = '<div class="text-gray-400 text-sm text-center py-6 italic">No winner yet. Start the Lucky 7 draw.</div>';
                 return;
             }
 
@@ -824,8 +862,8 @@
                 <div class="winner-entry">
                     <div class="w-6 h-6 rounded-full bg-[#FFB400] text-white flex items-center justify-center font-bold text-xs flex-shrink-0"><i class="fa-solid fa-star"></i></div>
                     <div class="flex-1 overflow-hidden">
-                        <div class="text-[10px] text-gray-500 uppercase font-semibold truncate">Guest in ${w.guest.location}</div>
-                        <div class="text-xs font-bold text-gray-900 truncate"><i class="fa-solid fa-gift text-[#FF385C] mr-1"></i> ${w.guest.guestName} won ${w.prize.name}</div>
+                        <div class="text-[10px] text-gray-500 uppercase font-semibold truncate">${w.guest.propertyName || w.guest.location} • ${w.guest.occupancyLabel || 'Booked'}</div>
+                        <div class="text-xs font-bold text-gray-900 truncate"><i class="fa-solid fa-gift text-[#FF385C] mr-1"></i> ${w.guest.occupancyLabel === 'Booked' ? (w.guest.guestName || w.guest.propertyName) : (w.guest.propertyName || w.guest.location)} won ${w.prize.name}</div>
                     </div>
                 </div>
             `).join('');
@@ -948,7 +986,7 @@
                 const fontSize = Math.max(10, Math.min(14, radius * 0.08));
                 ctx.font = `bold ${fontSize}px Poppins`;
 
-                let text = gamePhase === 'apartment' ? data[i].location : data[i].name;
+                let text = gamePhase === 'apartment' ? data[i].wheelLabel : data[i].name;
                 if (text.length > 20) text = text.substring(0, 18) + '...';
 
                 const inset = radius > 150 ? 25 : 15;
@@ -997,7 +1035,7 @@
             const data = getActiveWheelData();
             if (isSpinning || data.length === 0) return;
             if (winners.length >= MAX_WINNERS) {
-                alert('The winner has already been drawn for this week!');
+                alert('The Lucky 7 draw has already been completed for this week.');
                 return;
             }
 
@@ -1145,9 +1183,9 @@
 
                 document.getElementById('overlay-icon').innerHTML = '<i class="fa-solid fa-building text-5xl md:text-6xl text-[#00A699] mb-4"></i>';
                 document.getElementById('overlay-title').textContent = 'Apartment Selected!';
-                document.getElementById('overlay-subtitle').textContent = `${selectedApartmentObj.guestName} is staying at:`;
-                document.getElementById('overlay-highlight').textContent = selectedApartmentObj.location;
-                document.getElementById('overlay-footer').textContent = 'Now, let\'s find out what reward is attached to this live booking.';
+                document.getElementById('overlay-subtitle').textContent = getApartmentSubtitle(selectedApartmentObj);
+                document.getElementById('overlay-highlight').textContent = `${selectedApartmentObj.propertyName} • ${selectedApartmentObj.occupancyLabel}`;
+                document.getElementById('overlay-footer').textContent = 'Now, let\'s find out what reward is attached to this apartment.';
                 document.getElementById('overlay-btn').innerHTML = 'Spin for their Prize <i class="fa-solid fa-rotate-right ml-2"></i>';
 
                 overlay.classList.add('active');
@@ -1156,21 +1194,20 @@
                 const winnerEntry = { guest: selectedApartmentObj, prize: wonPrize };
                 winners.push(winnerEntry);
 
-                mockGuests = mockGuests.filter(g => {
-                    if (selectedApartmentObj.transactionId && g.transactionId) return g.transactionId !== selectedApartmentObj.transactionId;
-                    return `${g.guestName}-${g.location}` !== `${selectedApartmentObj.guestName}-${selectedApartmentObj.location}`;
-                });
+                mockGuests = mockGuests.filter(g => g.propertyId !== selectedApartmentObj.propertyId);
 
                 fireConfetti();
                 persistWinner(winnerEntry);
 
                 document.getElementById('overlay-icon').innerHTML = '<i class="fa-solid fa-crown text-5xl md:text-6xl text-[#FFB400] mb-4"></i>';
-                document.getElementById('overlay-title').textContent = 'We have a Winner!';
-                document.getElementById('overlay-subtitle').textContent = `${selectedApartmentObj.guestName} in ${selectedApartmentObj.location} has won:`;
+                document.getElementById('overlay-title').textContent = 'Lucky Winner!';
+                document.getElementById('overlay-subtitle').textContent = selectedApartmentObj.occupancyLabel === 'Booked'
+                    ? `${selectedApartmentObj.guestName} in ${selectedApartmentObj.propertyName} has won:`
+                    : `${selectedApartmentObj.propertyName} (${selectedApartmentObj.occupancyLabel}) has won:`;
                 document.getElementById('overlay-highlight').textContent = wonPrize.name;
                 document.getElementById('overlay-footer').textContent = wonPrize.desc;
 
-                const nextActionText = winners.length >= MAX_WINNERS ? 'Finish Draw' : 'Draw Next Winner';
+                const nextActionText = winners.length >= MAX_WINNERS ? 'Finish Lucky 7' : 'Draw Next Lucky Winner';
                 document.getElementById('overlay-btn').innerHTML = `${nextActionText} <i class="fa-solid fa-arrow-right ml-2"></i>`;
 
                 overlay.classList.add('active');
@@ -1189,7 +1226,7 @@
                 spinBtn.disabled = false;
             } else {
                 gamePhase = 'apartment';
-                phaseText.textContent = 'One of our guest in this spinwheel must win a reward!';
+                phaseText.textContent = getApartmentWheelHeadline();
                 spinBtn.innerHTML = '<i class="fa-solid fa-building"></i> Spin for Next Apartment';
 
                 renderWinners();
@@ -1197,8 +1234,8 @@
 
                 if (winners.length >= MAX_WINNERS) {
                     spinBtn.disabled = true;
-                    spinBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Raffle Complete';
-                    phaseText.textContent = 'Draws Finished';
+                    spinBtn.innerHTML = '<i class="fa-solid fa-check-double"></i> Lucky 7 Complete';
+                    phaseText.textContent = 'Lucky 7 draw finished';
                 } else {
                     spinBtn.disabled = false;
                 }

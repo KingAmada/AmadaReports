@@ -4599,6 +4599,11 @@
             }, 6000);
         }
 
+        getExclusiveExpiredOfferMessage() {
+            const missedOffer = this.exclusiveDiscountPhase === 1 ? '50% OFF' : '15% OFF';
+            return `You just missed a <span class="text-red-200">${missedOffer}</span> opportunity... Standard rates apply.`;
+        }
+
         restartExclusiveMasterTimer() {
             const discountEl = document.getElementById('guestExclusiveCountdownTimer');
             const heroVipEl = document.getElementById('guestExclusiveHeroVipTimer');
@@ -4629,7 +4634,7 @@
                 discountEl.classList.add('text-gray-900');
                 discountEl.innerText = this.formatExclusiveTime(this.exclusiveDiscountTimeLeft, true);
             } else {
-                bannerText.innerHTML = 'OFFERS EXPIRED. Standard rates apply.';
+                bannerText.innerHTML = this.getExclusiveExpiredOfferMessage();
                 discountEl.style.display = 'none';
                 banner.classList.remove('urgency-banner-red', 'border-red-900', 'bg-gray-900');
                 banner.classList.add('bg-black');
@@ -4662,7 +4667,7 @@
                     discountEl.classList.remove('text-amada-red');
                     discountEl.classList.add('text-gray-900');
                 } else {
-                    bannerText.innerHTML = 'OFFERS EXPIRED. Standard rates apply.';
+                    bannerText.innerHTML = this.getExclusiveExpiredOfferMessage();
                     discountEl.style.display = 'none';
                     banner.classList.remove('bg-gray-900');
                     banner.classList.add('bg-black');
