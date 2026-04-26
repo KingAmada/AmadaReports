@@ -2244,3 +2244,393 @@
                 height: 340px !important;
             }
         }
+
+/* =====================================================
+   BOOKILY APP-LIKE MOBILE COMPACT MODE
+   Final mobile override: keep summaries tiled, not stacked.
+===================================================== */
+@media (max-width: 768px) {
+    body {
+        background: #f7f7f7;
+    }
+
+    section {
+        padding-top: 28px !important;
+        padding-bottom: 28px !important;
+    }
+
+    .nav-container {
+        padding: 10px 14px !important;
+    }
+
+    .brand {
+        font-size: 1.05rem !important;
+    }
+
+    .mobile-menu-button {
+        width: 36px !important;
+        height: 36px !important;
+        box-shadow: none !important;
+        position: relative;
+        z-index: 2;
+    }
+
+    #homeView {
+        padding-top: 58px !important;
+    }
+
+    .hero {
+        min-height: auto !important;
+        padding: 28px 14px 18px !important;
+        align-items: flex-start !important;
+    }
+
+    .hero-content {
+        display: block !important;
+        gap: 0 !important;
+    }
+
+    .hero-text h1 {
+        font-size: 2rem !important;
+        line-height: 1.05 !important;
+        margin-bottom: 10px !important;
+    }
+
+    .hero-text p {
+        font-size: 0.86rem !important;
+        line-height: 1.45 !important;
+        margin-bottom: 14px !important;
+        max-width: 100% !important;
+    }
+
+    .hero-text > div {
+        gap: 8px !important;
+        margin-top: 10px !important;
+    }
+
+    .hero-text .btn-primary,
+    .hero-text .btn-outline {
+        padding: 10px 14px !important;
+        font-size: 0.78rem !important;
+        border-width: 1px !important;
+    }
+
+    .search-widget {
+        margin-top: 18px !important;
+        padding: 14px !important;
+        border-radius: 18px !important;
+    }
+
+    .input-floating {
+        margin-bottom: 10px !important;
+    }
+
+    .input-floating input,
+    .input-floating select {
+        padding: 15px 12px 8px !important;
+        font-size: 0.82rem !important;
+        border-radius: 12px !important;
+    }
+
+    .input-floating label {
+        font-size: 0.75rem !important;
+    }
+
+    .stats-grid,
+    .guest-stats-bar,
+    .host-sales-metrics,
+    .host-proof-band,
+    .kpi-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+    }
+
+    .stat-item,
+    .host-sales-metric,
+    .guest-stats-bar > *,
+    .kpi-card {
+        padding: 12px !important;
+        border-radius: 14px !important;
+    }
+
+    .stat-item h3,
+    .host-sales-metric strong,
+    .kpi-card h3 {
+        font-size: 1.2rem !important;
+    }
+
+    .stat-item p,
+    .host-sales-metric span,
+    .kpi-card p {
+        font-size: 0.68rem !important;
+        line-height: 1.25 !important;
+    }
+
+    body[data-initial-view="host"] #hostView {
+        padding-top: 56px !important;
+    }
+
+    .host-sales-hero,
+    .host-page-hero {
+        min-height: auto !important;
+        padding: 26px 0 18px !important;
+    }
+
+    .host-sales-shell,
+    .host-page-shell {
+        width: calc(100% - 24px) !important;
+    }
+
+    .host-sales-copy,
+    .host-page-copy {
+        padding: 28px 0 24px !important;
+    }
+
+    .host-sales-kicker,
+    .host-kicker {
+        font-size: 0.62rem !important;
+        padding: 6px 9px !important;
+        margin-bottom: 10px !important;
+    }
+
+    .host-sales-copy h1,
+    .host-page-copy h1,
+    .host-section-heading h2,
+    .host-closer h2 {
+        font-size: 1.8rem !important;
+        line-height: 1.05 !important;
+        margin-bottom: 10px !important;
+    }
+
+    .host-sales-copy p,
+    .host-page-copy p,
+    .host-section-heading p,
+    .host-closer p {
+        font-size: 0.82rem !important;
+        line-height: 1.45 !important;
+        margin-bottom: 14px !important;
+    }
+
+    .host-sales-actions,
+    .host-page-actions {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 8px !important;
+        margin-bottom: 14px !important;
+    }
+
+    .host-sales-actions .btn-primary,
+    .host-sales-actions .btn-outline,
+    .host-page-actions .btn-primary,
+    .host-page-actions .btn-outline {
+        width: 100% !important;
+        padding: 10px 8px !important;
+        font-size: 0.7rem !important;
+        justify-content: center !important;
+        border-width: 1px !important;
+    }
+
+    .host-benefits-grid,
+    .host-steps-grid,
+    .host-problem-grid,
+    .host-system-grid,
+    .host-flow-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }
+
+    .host-benefit-card,
+    .host-step-card,
+    .host-sales-card,
+    .host-system-card,
+    .host-flow-card,
+    .panel,
+    .calc-box,
+    .raffle-box {
+        padding: 14px !important;
+        border-radius: 16px !important;
+    }
+
+    .host-benefit-card i,
+    .host-sales-card i {
+        font-size: 1rem !important;
+        margin-bottom: 8px !important;
+    }
+
+    .host-benefit-card h3,
+    .host-step-card h3,
+    .host-sales-card h3,
+    .host-system-card h3 {
+        font-size: 0.86rem !important;
+        line-height: 1.2 !important;
+        margin-bottom: 6px !important;
+    }
+
+    .host-benefit-card p,
+    .host-step-card p,
+    .host-sales-card p,
+    .host-system-card p {
+        font-size: 0.68rem !important;
+        line-height: 1.35 !important;
+    }
+
+    #guestExclusivePage {
+        font-size: 0.85rem !important;
+    }
+
+    #guestExclusiveTopBanner {
+        padding: 6px 10px !important;
+    }
+
+    #guestExclusiveTopBanner p {
+        font-size: 0.72rem !important;
+        line-height: 1.25 !important;
+    }
+
+    .guest-sales-hero {
+        grid-template-columns: 1fr !important;
+        gap: 12px !important;
+        padding: 18px 12px !important;
+    }
+
+    .guest-sales-copy {
+        padding: 18px 14px !important;
+    }
+
+    .guest-sales-copy h1 {
+        font-size: 1.8rem !important;
+        line-height: 1.05 !important;
+    }
+
+    .guest-sales-copy p {
+        font-size: 0.82rem !important;
+        line-height: 1.4 !important;
+    }
+
+    .guest-assurance-band,
+    .guest-offer-stack,
+    .reward-wheel-layout {
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }
+
+    .guest-assurance-item,
+    .guest-benefit-card,
+    .guest-sales-card {
+        padding: 12px !important;
+        border-radius: 15px !important;
+    }
+
+    .cards-grid,
+    .cards-grid.list-view,
+    #guestExclusiveListingsGrid,
+    #guestExclusiveListings,
+    .guest-exclusive-listings,
+    .guest-exclusive-grid {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }
+
+    .cards-grid.list-view .property-card,
+    .property-card,
+    .listing-card,
+    .listing-card.list-mode {
+        display: flex !important;
+        flex-direction: column !important;
+        grid-template-columns: none !important;
+        border-radius: 16px !important;
+        overflow: hidden !important;
+        min-height: 0 !important;
+    }
+
+    .cards-grid.list-view .carousel-wrapper,
+    .carousel-wrapper,
+    .listing-card .guest-exclusive-media {
+        width: 100% !important;
+        height: auto !important;
+        aspect-ratio: 1 / 1 !important;
+        min-height: 0 !important;
+        border-radius: 16px 16px 0 0 !important;
+    }
+
+    .card-content,
+    .guest-exclusive-card-body {
+        padding: 8px !important;
+        gap: 5px !important;
+    }
+
+    .prop-name,
+    .guest-exclusive-card-header h4 {
+        font-size: 0.78rem !important;
+        line-height: 1.15 !important;
+        white-space: nowrap !important;
+        overflow: hidden !important;
+        text-overflow: ellipsis !important;
+    }
+
+    .prop-loc,
+    .guest-exclusive-card-location {
+        font-size: 0.62rem !important;
+        line-height: 1.25 !important;
+    }
+
+    .prop-price,
+    .guest-exclusive-card-footer p.text-2xl {
+        font-size: 0.82rem !important;
+    }
+
+    .prop-features,
+    .guest-exclusive-card-perks,
+    .guest-exclusive-card-meta {
+        display: none !important;
+    }
+
+    .status-badge,
+    .cards-grid.list-view .status-badge {
+        left: auto !important;
+        right: 8px !important;
+        top: 8px !important;
+        font-size: 0.58rem !important;
+        padding: 4px 7px !important;
+    }
+
+    .filter-bar,
+    .controls-bar,
+    .dashboard-controls,
+    .guest-exclusive-controls {
+        gap: 8px !important;
+        padding: 10px !important;
+        border-radius: 16px !important;
+    }
+
+    .filter-bar select,
+    .filter-bar input,
+    .controls-bar select,
+    .controls-bar input,
+    .guest-exclusive-controls select,
+    .guest-exclusive-controls input {
+        min-height: 38px !important;
+        font-size: 0.78rem !important;
+        border-radius: 10px !important;
+    }
+
+    .modal,
+    .modal-overlay {
+        align-items: flex-end !important;
+        padding: 10px !important;
+    }
+
+    .modal-content,
+    .modal-overlay .modal-content,
+    .booking-modal-content {
+        width: 100% !important;
+        max-height: calc(100vh - 20px) !important;
+        border-radius: 22px 22px 14px 14px !important;
+        padding: 16px !important;
+    }
+
+    footer {
+        padding: 32px 16px !important;
+    }
+}
