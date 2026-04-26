@@ -145,6 +145,10 @@
         }
     }
 
+    window.toggleMobileMenu = toggleMobileMenu;
+    window.closeMobileMenu = closeMobileMenu;
+    window.switchView = switchView;
+
     // Revenue Calculator Logic
     function updateCalc() {
         const rate = parseInt(document.getElementById('calcLoc').value);
@@ -4452,8 +4456,8 @@
             }
 
             container.className = this.guestViewMode === 'list'
-                ? 'grid grid-cols-1 gap-6'
-                : 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10';
+                ? 'grid grid-cols-2 md:grid-cols-1 gap-3 md:gap-6'
+                : 'grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-10';
             if (mapArea) mapArea.classList.add('hidden');
 
             if (!data.length) {
