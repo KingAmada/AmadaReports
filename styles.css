@@ -78,6 +78,20 @@
             line-height: 1.2;
         }
         .nav-links a:hover { color: var(--primary); }
+        .mobile-menu-button {
+            display: none;
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            border: 1px solid rgba(0,0,0,0.08);
+            background: #fff;
+            color: var(--dark);
+            align-items: center;
+            justify-content: center;
+            font-size: 1.05rem;
+            box-shadow: var(--shadow-sm);
+            cursor: pointer;
+        }
         
         .btn-primary {
             background: var(--primary); color: white; padding: 12px 22px;
@@ -116,6 +130,11 @@
             border: 1px solid rgba(0,0,0,0.08);
             box-shadow: 0 20px 40px rgba(0,0,0,0.16);
             backdrop-filter: blur(14px);
+            animation: installPromptIn 0.28s ease-out;
+        }
+        @keyframes installPromptIn {
+            from { opacity: 0; transform: translateY(16px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         .pwa-install-copy {
             display: flex;
@@ -1665,12 +1684,48 @@
             .nav-container {
                 padding-top: 12px;
                 padding-bottom: 12px;
+                position: relative;
             }
             .brand {
                 font-size: 1.2rem;
             }
+            .mobile-menu-button {
+                display: inline-flex;
+            }
             .nav-links {
                 display: none;
+                position: absolute;
+                top: calc(100% + 8px);
+                left: 12px;
+                right: 12px;
+                flex-direction: column;
+                align-items: stretch;
+                gap: 8px;
+                padding: 10px;
+                background: rgba(255,255,255,0.98);
+                border: 1px solid rgba(0,0,0,0.08);
+                border-radius: 18px;
+                box-shadow: 0 18px 40px rgba(0,0,0,0.14);
+                backdrop-filter: blur(18px);
+                -webkit-backdrop-filter: blur(18px);
+            }
+            .nav-links.is-open {
+                display: flex;
+            }
+            .nav-links a,
+            .nav-links .btn-primary,
+            .nav-links .btn-outline {
+                width: 100%;
+                min-height: 44px;
+                justify-content: flex-start;
+                border-radius: 14px;
+                padding: 11px 14px;
+                font-size: 0.92rem;
+            }
+            .nav-links a {
+                display: flex;
+                align-items: center;
+                background: #f7f7f7;
             }
             .hero {
                 min-height: auto;
@@ -1785,21 +1840,30 @@
                 height: 420px !important;
             }
             .pwa-install-prompt {
-                left: 12px;
-                right: 12px;
-                bottom: 12px;
+                left: 14px;
+                right: 14px;
+                bottom: 14px;
                 max-width: none;
-                flex-direction: column;
-                align-items: stretch;
+                flex-direction: row;
+                align-items: center;
+                gap: 10px;
+                padding: 10px 12px;
+                border-radius: 18px;
             }
+            .pwa-install-copy strong { font-size: 0.88rem; }
+            .pwa-install-copy span { display: none; }
             .pwa-install-actions {
-                width: 100%;
-                flex-direction: column;
+                width: auto;
+                flex-direction: row;
+                gap: 6px;
             }
             .pwa-install-actions .btn-primary,
             .pwa-install-actions .btn-outline {
-                width: 100%;
+                width: auto;
                 justify-content: center;
+                padding: 8px 10px;
+                font-size: 0.78rem;
+                border-width: 1px;
             }
         }
 
@@ -1807,6 +1871,241 @@
             #homeView,
             #portalView {
                 padding-top: 64px;
+            }
+            #guestExclusivePage {
+                background: #fff;
+            }
+            #guestExclusiveTopBanner {
+                gap: 4px !important;
+                padding: 7px 10px !important;
+                font-size: 0.72rem;
+                line-height: 1.2;
+            }
+            #guestExclusiveCountdownTimer {
+                font-size: 0.9rem !important;
+                padding: 3px 8px !important;
+            }
+            #guestExclusivePage .relative.h-screen {
+                height: auto !important;
+                min-height: 0 !important;
+                padding: 14px 12px 16px;
+                background: #fff;
+            }
+            #guestExclusivePage .slide {
+                display: none;
+            }
+            #guestExclusivePage .relative.z-10.h-full {
+                min-height: 0;
+                padding: 0;
+                display: block;
+            }
+            #guestExclusivePage .w-full.lg\\:w-1\\/2:first-child {
+                display: none;
+            }
+            #guestExclusiveSearchWidget {
+                padding: 12px !important;
+                border-radius: 18px !important;
+                box-shadow: 0 8px 22px rgba(0,0,0,0.08) !important;
+                border-color: #eee !important;
+                background: #fff !important;
+            }
+            #guestExclusiveSearchWidget h3,
+            #guestExclusiveSearchWidget > p {
+                display: none;
+            }
+            #guestExclusiveSearchWidget .space-y-4 {
+                display: grid;
+                gap: 8px !important;
+            }
+            #guestExclusiveSearchWidget .guest-exclusive-reservation-field {
+                padding: 7px 10px;
+                border-radius: 14px;
+                background: #f8f8f8;
+            }
+            .guest-stats-strip {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+                padding: 12px;
+            }
+            .guest-stat-pill {
+                padding: 10px;
+                border-radius: 16px;
+            }
+            .guest-stat-pill strong {
+                font-size: 1.08rem;
+            }
+            .guest-stat-pill span {
+                font-size: 0.68rem;
+            }
+            .guest-raffle-banner-wrap {
+                padding: 0 12px;
+            }
+            .guest-raffle-banner {
+                align-items: flex-start;
+                border-radius: 16px;
+                padding: 10px 12px;
+                font-size: 0.76rem;
+                line-height: 1.35;
+            }
+            #guestExclusivePage section.py-16 {
+                padding: 16px 10px 76px !important;
+            }
+            #guestExclusivePage section.py-16 h3 {
+                font-size: 1.35rem !important;
+                line-height: 1.1;
+            }
+            #guestExclusivePage section.py-16 h3 + p {
+                display: none;
+            }
+            #guestExclusivePage .inline-flex.bg-white.rounded-full {
+                width: 100%;
+                display: grid !important;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                border-radius: 16px !important;
+                box-shadow: none !important;
+            }
+            #guestExclusivePage .inline-flex.bg-white.rounded-full button {
+                padding: 10px 6px !important;
+                justify-content: center;
+                border-radius: 12px !important;
+                font-size: 0.75rem;
+            }
+            #guestExclusivePage .inline-flex.bg-white.rounded-full button span {
+                display: none;
+            }
+            #guestExclusivePage .guest-exclusive-filter-field {
+                padding: 7px 9px;
+                border-radius: 13px;
+            }
+            #guestExclusivePage .guest-exclusive-filter-field span {
+                font-size: 0.62rem;
+            }
+            #guestExclusivePage .guest-exclusive-filter-field select,
+            #guestExclusiveSearchInput {
+                font-size: 0.78rem !important;
+            }
+            #guestExclusiveListingsGrid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+                gap: 10px !important;
+            }
+            .listing-card {
+                border-radius: 16px !important;
+                box-shadow: 0 5px 16px rgba(0,0,0,0.08) !important;
+            }
+            .listing-card:hover {
+                transform: none;
+            }
+            .listing-card.list-mode {
+                display: flex;
+            }
+            .listing-card .absolute.top-4.left-4,
+            .listing-card .absolute.top-4.right-4 {
+                top: 8px !important;
+            }
+            .listing-card .absolute.top-4.left-4 {
+                left: 8px !important;
+                max-width: calc(100% - 50px);
+            }
+            .listing-card .absolute.top-4.right-4 {
+                right: 8px !important;
+            }
+            .listing-card .absolute.top-4.left-4 span {
+                font-size: 0.55rem !important;
+                padding: 4px 6px !important;
+                border-radius: 8px !important;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 100%;
+            }
+            .listing-card .absolute.top-4.left-4 span + span {
+                display: none;
+            }
+            .listing-card .absolute.top-4.right-4 button {
+                width: 30px !important;
+                height: 30px !important;
+            }
+            .listing-card .guest-exclusive-media {
+                height: auto !important;
+                aspect-ratio: 1 / 1;
+                min-height: 0 !important;
+            }
+            .listing-card .guest-exclusive-card-body {
+                padding: 9px !important;
+                gap: 5px;
+            }
+            .listing-card .guest-exclusive-card-header {
+                display: block !important;
+                margin-bottom: 0 !important;
+            }
+            .listing-card .guest-exclusive-card-header h4 {
+                font-family: var(--font-body) !important;
+                font-size: 0.86rem !important;
+                line-height: 1.15;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .listing-card .guest-exclusive-card-header span {
+                margin-top: 4px;
+                width: fit-content;
+                font-size: 0.66rem !important;
+                padding: 2px 6px !important;
+            }
+            .listing-card .guest-exclusive-card-location {
+                font-size: 0.68rem !important;
+                line-height: 1.25;
+                margin-bottom: 4px !important;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+            }
+            .listing-card .guest-exclusive-card-perks,
+            .listing-card .guest-exclusive-card-meta {
+                display: none !important;
+            }
+            .listing-card .guest-exclusive-card-footer {
+                display: block !important;
+                padding-top: 6px !important;
+                margin-top: 0 !important;
+                border-top: 0 !important;
+            }
+            .listing-card .guest-exclusive-card-footer p:first-child {
+                display: none;
+            }
+            .listing-card .guest-exclusive-card-footer p.text-2xl {
+                font-size: 0.88rem !important;
+                line-height: 1.1;
+            }
+            .listing-card .guest-exclusive-card-footer p.text-2xl span {
+                font-size: 0.62rem !important;
+            }
+            .listing-card .guest-exclusive-card-footer button {
+                width: 100%;
+                margin-top: 7px;
+                padding: 8px 6px !important;
+                border-radius: 10px !important;
+                font-size: 0.72rem !important;
+            }
+            .listing-card > div:last-child {
+                display: none;
+            }
+            #guestExclusiveMapArea {
+                height: calc(100vh - 180px) !important;
+                border-radius: 18px !important;
+            }
+            #guestExclusivePerksWidget {
+                display: none !important;
+            }
+            .modal-overlay {
+                padding: 10px;
+                align-items: flex-end;
+            }
+            .modal-overlay .modal-content {
+                width: 100%;
+                max-height: calc(100vh - 20px);
+                border-radius: 22px !important;
             }
             .hero-text h1,
             .guest-sales-copy h1,

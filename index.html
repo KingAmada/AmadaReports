@@ -98,6 +98,9 @@
     <header id="mainHeader">
         <div class="nav-container">
             <a href="#" class="brand" onclick="switchView('home'); return false;"><i class="fa-solid fa-crown"></i> Bookily</a>
+            <button type="button" class="mobile-menu-button" onclick="toggleMobileMenu()" aria-label="Open menu" aria-expanded="false">
+                <i class="fa-solid fa-bars"></i>
+            </button>
             <div class="nav-links">
                 <a href="#" onclick="switchView('guest'); return false;">Find a Stay</a>
                 <a href="./host.html">List Your Property</a>
@@ -423,7 +426,7 @@
                                 <i class="fa-solid fa-hourglass-half"></i>
                             </div>
                             <div class="relative z-10">
-                                <p class="text-sm font-bold text-gray-800">Checkout within <span id="guestExclusiveHeroVipTimer" class="text-amada-red font-mono text-lg font-black">03:45</span></p>
+                                <p class="text-sm font-bold text-gray-800">Book within <span id="guestExclusiveHeroVipTimer" class="text-amada-red font-mono text-lg font-black">03:45</span></p>
                                 <p class="text-xs text-gray-500 font-medium">To unlock stackable <strong class="text-amada-dark">VIP Perks & Rewards</strong>.</p>
                             </div>
                         </div>
@@ -590,7 +593,7 @@
                     <i class="fa-solid fa-gift"></i>
                 </div>
                 <h4 class="font-black text-gray-900 text-xs uppercase tracking-widest mb-1">🎁 Claim Your Perks</h4>
-                <p class="text-[10px] text-gray-500 mb-3 font-medium leading-tight">Checkout before the timers run out to keep these stackable rewards!</p>
+                <p class="text-[10px] text-gray-500 mb-3 font-medium leading-tight">Book before the timers run out to keep these stackable rewards!</p>
                 <div id="guestExclusiveMissedOfferNotice" class="hidden mb-3 bg-black text-white border border-red-900 rounded-xl px-3 py-2 text-[11px] font-black leading-tight"></div>
 
                 <div class="space-y-1.5 max-h-[300px] overflow-y-auto slim-scrollbar pr-1 pb-1">

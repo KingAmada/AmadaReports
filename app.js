@@ -82,6 +82,7 @@
 
     // View Switcher (SPA Navigation)
     async function switchView(view) {
+        closeMobileMenu();
         const requestId = ++activeViewRequestId;
         const resolvedView = view === 'home' ? 'guest' : view;
         document.getElementById('homeView').style.display = resolvedView === 'marketing' ? 'block' : 'none';
@@ -120,6 +121,28 @@
         }
         if (resolvedView === 'host') updateCalc();
         window.scrollTo(0, 0);
+    }
+
+    function closeMobileMenu() {
+        const links = document.querySelector('#mainHeader .nav-links');
+        const button = document.querySelector('#mainHeader .mobile-menu-button');
+        links?.classList.remove('is-open');
+        button?.setAttribute('aria-expanded', 'false');
+        button?.querySelector('i')?.classList.remove('fa-xmark');
+        button?.querySelector('i')?.classList.add('fa-bars');
+    }
+
+    function toggleMobileMenu() {
+        const links = document.querySelector('#mainHeader .nav-links');
+        const button = document.querySelector('#mainHeader .mobile-menu-button');
+        if (!links || !button) return;
+        const isOpen = links.classList.toggle('is-open');
+        button.setAttribute('aria-expanded', String(isOpen));
+        const icon = button.querySelector('i');
+        if (icon) {
+            icon.classList.toggle('fa-bars', !isOpen);
+            icon.classList.toggle('fa-xmark', isOpen);
+        }
     }
 
     // Revenue Calculator Logic
@@ -228,6 +251,7 @@
 
     let deferredPwaInstallPrompt = null;
     let pwaInstallDismissed = false;
+    let pwaInstallCycleTimer = null;
 
     function isPwaInstallDisabledOnPage() {
         return document.body?.dataset.disablePwaInstall === 'true';
@@ -242,8 +266,23 @@
         if (floatingPrompt) floatingPrompt.hidden = !canShow;
     }
 
+    function schedulePwaInstallCycle() {
+        clearTimeout(pwaInstallCycleTimer);
+        if (!deferredPwaInstallPrompt || pwaInstallDismissed || isPwaInstallDisabledOnPage()) return;
+        pwaInstallCycleTimer = setTimeout(() => {
+            setPwaInstallVisibility(false);
+            pwaInstallCycleTimer = setTimeout(() => {
+                if (deferredPwaInstallPrompt && !pwaInstallDismissed) {
+                    setPwaInstallVisibility(true);
+                    schedulePwaInstallCycle();
+                }
+            }, 18000);
+        }, 7000);
+    }
+
     function dismissPwaInstallPrompt() {
         pwaInstallDismissed = true;
+        clearTimeout(pwaInstallCycleTimer);
         setPwaInstallVisibility(false);
     }
 
@@ -264,6 +303,7 @@
             dismissPwaInstallPrompt();
         }
         deferredPwaInstallPrompt = null;
+        clearTimeout(pwaInstallCycleTimer);
         setPwaInstallVisibility(false);
     }
 
@@ -278,11 +318,12 @@
     }
 
     window.addEventListener('beforeinstallprompt', event => {
-        if (isPwaInstallDisabledOnPage()) return;
         event.preventDefault();
+        if (isPwaInstallDisabledOnPage()) return;
         deferredPwaInstallPrompt = event;
         pwaInstallDismissed = false;
         setPwaInstallVisibility(true);
+        schedulePwaInstallCycle();
     });
 
     window.addEventListener('appinstalled', () => {
