@@ -145,9 +145,22 @@
         }
     }
 
+    function bindMobileMenu() {
+        const button = document.querySelector('#mainHeader .mobile-menu-button');
+        if (!button || button.dataset.bound === 'true') return;
+        button.dataset.bound = 'true';
+        button.addEventListener('click', event => {
+            event.preventDefault();
+            event.stopPropagation();
+            toggleMobileMenu();
+        });
+    }
+
     window.toggleMobileMenu = toggleMobileMenu;
     window.closeMobileMenu = closeMobileMenu;
     window.switchView = switchView;
+    document.addEventListener('DOMContentLoaded', bindMobileMenu);
+    window.addEventListener('load', bindMobileMenu);
 
     // Revenue Calculator Logic
     function updateCalc() {

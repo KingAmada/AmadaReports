@@ -1,4 +1,4 @@
-const CACHE_NAME = 'bookily-engine-v1';
+const CACHE_NAME = 'bookily-engine-v2';
 const APP_SHELL = [
   './',
   './index.html',

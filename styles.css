@@ -2634,3 +2634,33 @@
         padding: 32px 16px !important;
     }
 }
+
+@media (max-width: 900px) {
+    #mainHeader {
+        z-index: 9999 !important;
+    }
+
+    #mainHeader .nav-container {
+        position: relative !important;
+    }
+
+    #mainHeader .mobile-menu-button {
+        display: inline-flex !important;
+        position: relative !important;
+        z-index: 10001 !important;
+        pointer-events: auto !important;
+    }
+
+    #mainHeader .nav-links {
+        display: none !important;
+        position: absolute !important;
+        top: calc(100% + 8px) !important;
+        left: 12px !important;
+        right: 12px !important;
+        z-index: 10000 !important;
+    }
+
+    #mainHeader .nav-links.is-open {
+        display: flex !important;
+    }
+}
