@@ -643,16 +643,12 @@
             this.exclusiveToastLocations = ["Maitama", "Wuse 2", "Asokoro", "Gwarinpa", "Katampe", "Lagos"];
             this.exclusiveToastActions = ["just booked the Penthouse!", "claimed a Free Massage!", "won a Free Night!", "secured 15% Off!", "got 100% Refunded!", "activated Free Protection!"];
             this.guestLoaderQuotes = [
-                'Every Friday we hold a raffle draw and 7 guests win Free Nights, 100% Refund, 50% off their next booking, Free Lunch, Late Checkout, and more.',
-                'Our guests win free nights when they book.',
-                'Our guests win free lunch when they book.',
-                'You might be lucky too and get 50% off.',
-                'Direct bookings unlock surprise rewards attached instantly to confirmed reservations.',
-                'Some guests walk away with full refunds after booking through the Friday raffle draw.',
-                'Booked stays can unlock free lunch, free nights, late checkout, and comeback discounts.',
-                'The next booking could come with a 50% discount if the raffle lands in your favor.',
-                'Guests who book early stay eligible for the strongest reward drops and timed perks.',
-                'Free nights, refund wins, meal perks, and bonus discounts are built into the Bookily experience.'
+                'Finding premium stays for you...',
+                'Checking live apartment availability...',
+                'Loading verified locations and prices...',
+                'Preparing booking rewards and perks...',
+                'Matching stays with active offers...',
+                'Getting the best apartments ready...'
             ];
             this.guestLoaderTestimonials = [
                 { name: 'Amaka E.', role: 'Weekend guest', text: 'Booked in minutes and still landed a reward on top of the stay.' },

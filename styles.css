@@ -623,8 +623,16 @@
         .guest-loader-copy h2 {
             font-family: var(--font-heading);
             color: white;
-            font-size: clamp(2rem, 4vw, 3.45rem);
+            font-size: clamp(2.45rem, 5vw, 4.35rem);
             line-height: 1.08;
+            margin-bottom: 14px;
+        }
+        .guest-loader-raffle-copy {
+            max-width: 720px;
+            color: rgba(255,255,255,0.72);
+            font-size: clamp(0.82rem, 1.2vw, 1rem);
+            line-height: 1.55;
+            margin: 0;
         }
         .guest-loader-testimonials {
             display: grid;
@@ -2669,5 +2677,114 @@
 
     #mainHeader .nav-links.is-open {
         display: flex !important;
+    }
+}
+
+@media (max-width: 768px) {
+    html {
+        font-size: 14px !important;
+    }
+
+    body {
+        font-size: 0.86rem !important;
+        line-height: 1.45 !important;
+    }
+
+    :where(h1, .text-7xl, .text-6xl, .text-5xl) {
+        font-size: clamp(1.75rem, 8vw, 2.35rem) !important;
+        line-height: 1.05 !important;
+    }
+
+    :where(h2, .text-4xl) {
+        font-size: clamp(1.35rem, 6vw, 1.8rem) !important;
+        line-height: 1.12 !important;
+    }
+
+    :where(h3, .text-3xl, .text-2xl) {
+        font-size: clamp(1rem, 4.5vw, 1.25rem) !important;
+        line-height: 1.18 !important;
+    }
+
+    :where(h4, h5, h6, p, li, label, input, select, textarea, button, a, small, span) {
+        line-height: 1.35;
+    }
+
+    :where(p, li, label, input, select, textarea, .text-lg, .text-xl) {
+        font-size: 0.82rem !important;
+    }
+
+    :where(.btn-primary, .btn-outline, button, .role-btn, .mgmt-tab, .w-tab) {
+        font-size: 0.78rem !important;
+    }
+
+    :where(.modal-content h2, .panel h2, .portal-header h2, .guest-loader-copy h2) {
+        font-size: clamp(1.35rem, 6vw, 1.8rem) !important;
+    }
+
+    .guest-experience-loader {
+        inset: 58px 0 0;
+        padding: 14px 10px;
+    }
+
+    .guest-loader-panel {
+        padding: 20px 16px;
+        border-radius: 22px;
+    }
+
+    .guest-loader-spinner-wrap {
+        font-size: 1rem !important;
+        margin-bottom: 16px;
+    }
+
+    .guest-loader-copy h2 {
+        font-size: clamp(2rem, 10vw, 2.8rem) !important;
+        line-height: 1.05 !important;
+    }
+
+    .guest-loader-raffle-copy {
+        font-size: 0.72rem !important;
+        line-height: 1.45 !important;
+    }
+
+    .guest-loader-testimonials {
+        grid-template-columns: 1fr !important;
+        gap: 8px;
+    }
+
+    .guest-loader-testimonial-card {
+        padding: 12px;
+        border-radius: 15px;
+    }
+
+    .guest-loader-testimonial-card p {
+        font-size: 0.72rem !important;
+        margin-bottom: 8px;
+    }
+
+    .guest-loader-testimonial-card strong,
+    .guest-loader-testimonial-card span {
+        font-size: 0.72rem !important;
+    }
+}
+
+@media (max-width: 480px) {
+    html {
+        font-size: 13px !important;
+    }
+
+    :where(h1, .text-7xl, .text-6xl, .text-5xl) {
+        font-size: clamp(1.55rem, 8.5vw, 2rem) !important;
+    }
+
+    :where(h2, .text-4xl) {
+        font-size: clamp(1.2rem, 6.5vw, 1.55rem) !important;
+    }
+
+    :where(p, li, label, input, select, textarea, .text-lg, .text-xl) {
+        font-size: 0.78rem !important;
+    }
+
+    .guest-loader-copy h2 {
+        font-size: clamp(1.85rem, 11vw, 2.45rem) !important;
     }
 }
