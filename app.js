@@ -51,33 +51,78 @@
     }
 
     async function submitGuestAccessLookup() {
+        const btn = document.getElementById('guestAccessSubmitBtn');
+        const originalText = btn?.innerHTML;
+        if (btn) {
+            btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Checking...';
+            btn.disabled = true;
+        }
+
         if(!window.appInitialized) {
             window.app = new AmadaApp();
             window.appInitialized = true;
         }
-        if (window.app?.ready) await window.app.ready;
-        window.app?.lookupGuestAccessReservations();
+        try {
+            if (window.app?.ready) await window.app.ready;
+            await window.app?.lookupGuestAccessReservations();
+        } catch (error) {
+            console.error('Guest access lookup failed:', error);
+            window.app?.showNotification("Guest access lookup could not be completed. Please try again.", "error");
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalText || '<i class="fa-solid fa-magnifying-glass"></i> Access';
+                btn.disabled = false;
+            }
+        }
     }
 
     async function submitLogin() {
-        closeModals();
+        const form = document.getElementById('hostLoginForm');
+        if (form && !form.checkValidity()) {
+            form.reportValidity();
+            return;
+        }
+
+        const btn = document.getElementById('loginSubmitBtn');
+        const originalText = btn?.innerHTML;
+        if (btn) {
+            const label = currentLoginMode === 'staff' ? 'Authorizing Team...' : 'Authorizing Host...';
+            btn.innerHTML = `<i class="fa-solid fa-circle-notch fa-spin"></i> ${label}`;
+            btn.disabled = true;
+        }
+
         if(!window.appInitialized) {
             window.app = new AmadaApp();
             window.appInitialized = true;
         }
-        if (window.app?.ready) await window.app.ready;
-        
-        if (currentLoginMode === 'host') {
-            const email = document.getElementById('loginEmail').value;
-            const pass = document.getElementById('loginPass').value;
-            await window.app.loginHost(email, pass);
-        } else {
-            const staffId = document.getElementById('loginStaffId').value;
-            const pin = document.getElementById('loginPin').value;
-            await window.app.loginStaff(staffId, pin);
+
+        try {
+            if (window.app?.ready) await window.app.ready;
+
+            let success = false;
+            if (currentLoginMode === 'host') {
+                const email = document.getElementById('loginEmail').value;
+                const pass = document.getElementById('loginPass').value;
+                success = await window.app.loginHost(email, pass);
+            } else {
+                const staffId = document.getElementById('loginStaffId').value;
+                const pin = document.getElementById('loginPin').value;
+                success = await window.app.loginStaff(staffId, pin);
+            }
+
+            if (success) {
+                document.getElementById('hostLoginForm').reset();
+                closeModals();
+            }
+        } catch (error) {
+            console.error('Login failed:', error);
+            window.app?.showNotification("Login could not be completed. Please try again.", "error");
+        } finally {
+            if (btn) {
+                btn.innerHTML = originalText || 'Authorize Access';
+                btn.disabled = false;
+            }
         }
-        
-        document.getElementById('hostLoginForm').reset();
     }
 
     // View Switcher (SPA Navigation)
@@ -412,7 +457,7 @@
     document.addEventListener('input', () => refreshFloatingLabels());
     document.addEventListener('change', () => refreshFloatingLabels());
 
-    function registerHost() {
+    async function registerHost() {
         const form = document.getElementById('hostForm');
         
         // Final robustness check
@@ -426,9 +471,7 @@
         btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin"></i> Setting up profile...';
         btn.disabled = true;
 
-        // Simulate network delay for realistic UX
-        setTimeout(async () => {
-            closeModals();
+        try {
             if(!window.appInitialized) {
                 window.app = new AmadaApp();
                 window.appInitialized = true;
@@ -449,13 +492,19 @@
                 return;
             }
             
-            await window.app.registerNewHost(name, email, phone, pass);
+            const success = await window.app.registerNewHost(name, email, phone, pass);
             
-            // Reset form and button state for next time
-            form.reset();
+            if (success) {
+                form.reset();
+                closeModals();
+            }
+        } catch (error) {
+            console.error('Host registration failed:', error);
+            window.app?.showNotification("Registration could not be completed. Please try again.", "error");
+        } finally {
             btn.innerHTML = originalText;
             btn.disabled = false;
-        }, 1200);
+        }
     }
 
 
@@ -2132,7 +2181,7 @@
             const normalized = (identifier || '').trim().toLowerCase();
             if (!this.supabase?.auth) {
                 this.showNotification("Supabase Auth is unavailable in this environment.", "error");
-                return;
+                return false;
             }
 
             const { data, error } = await this.supabase.auth.signInWithPassword({
@@ -2142,41 +2191,42 @@
 
             if (error || !data.user) {
                 this.showNotification("Invalid host credentials", "error");
-                return;
+                return false;
             }
 
             this.authUser = data.user;
             const host = await this.hydrateHostFromAuthUser(data.user, normalized, pass);
             if (!host) {
                 this.showNotification("Host profile not found for this authenticated account.", "error");
-                return;
+                return false;
             }
 
             this.showNotification(`Welcome back, ${host.name}`, "success");
             await switchView('portal');
+            return true;
         }
         
         async loginStaff(identifier, pin) {
             const normalizedPhone = String(identifier || '').replace(/\D/g, '');
             if (!normalizedPhone || !pin) {
                 this.showNotification("Enter your team phone number and password.", "error");
-                return;
+                return false;
             }
 
             if (!/^\d{11}$/.test(normalizedPhone)) {
                 this.showNotification("Enter a valid 11-digit team phone number.", "error");
-                return;
+                return false;
             }
 
             if (!this.supabase?.auth) {
                 this.showNotification("Supabase Auth is unavailable in this environment.", "error");
-                return;
+                return false;
             }
 
             const memberProfile = await this.findTeamMemberByPhone(normalizedPhone);
             if (!memberProfile) {
                 this.showNotification("No team member was found for that phone number.", "error");
-                return;
+                return false;
             }
 
             const authEmail = memberProfile.email || this.getTeamAuthEmail(normalizedPhone);
@@ -2200,12 +2250,12 @@
 
                 if (signUpResult.error || !signUpResult.data.user) {
                     this.showNotification("Invalid team access credentials", "error");
-                    return;
+                    return false;
                 }
 
                 if (!signUpResult.data.session) {
                     this.showNotification("Team account created. Complete email verification, then log in.", "info");
-                    return;
+                    return false;
                 }
 
                 authResult = signUpResult;
@@ -2215,18 +2265,19 @@
             const member = await this.hydrateTeamMemberFromAuthUser(authResult.data.user, authEmail, normalizedPhone);
             if (!member) {
                 this.showNotification("Team profile not found for this authenticated account.", "error");
-                return;
+                return false;
             }
 
             this.showNotification(`${member.name} signed in as ${member.role}`, "success");
             await switchView('portal');
+            return true;
         }
 
         async registerNewHost(name, email, phone, pass) {
             const normalizedEmail = String(email || '').trim().toLowerCase();
             if (!this.supabase?.auth) {
                 this.showNotification("Supabase Auth is unavailable in this environment.", "error");
-                return;
+                return false;
             }
 
             const { data, error } = await this.supabase.auth.signUp({
@@ -2243,12 +2294,12 @@
 
             if (error || !data.user) {
                 this.showNotification(error?.message || "Could not create host account.", "error");
-                return;
+                return false;
             }
 
             if (!data.session) {
                 this.showNotification("Account created. Complete email verification, then log in. Your host profile will finish linking on first sign-in.", "info");
-                return;
+                return true;
             }
 
             this.authUser = data.user;
@@ -2265,18 +2316,19 @@
 
             if (hostError) {
                 this.showNotification(hostError.message || "Host profile could not be linked.", "error");
-                return;
+                return false;
             }
 
             const host = await this.hydrateHostFromAuthUser(data.user, normalizedEmail);
             if (!host) {
                 this.showNotification("Host profile was created but could not be loaded.", "error");
-                return;
+                return false;
             }
 
             this.saveLocalData();
             this.showNotification(`Profile created successfully! Welcome to Bookily.`, "success");
             await switchView('portal');
+            return true;
         }
 
         renderHostDashboard(container) {
