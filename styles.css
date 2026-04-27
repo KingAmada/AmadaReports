@@ -590,23 +590,22 @@
         .guest-loader-spinner-wrap {
             display: inline-flex;
             align-items: center;
-            gap: 12px;
-            padding: 10px 16px;
-            border-radius: 999px;
-            background: rgba(255,255,255,0.08);
-            border: 1px solid rgba(255,255,255,0.08);
-            color: rgba(255,255,255,0.82);
-            font-size: 0.88rem;
-            font-weight: 700;
-            margin-bottom: 24px;
+            gap: 16px;
+            color: white;
+            font-family: var(--font-heading);
+            font-size: clamp(2.45rem, 5vw, 4.35rem);
+            font-weight: 800;
+            line-height: 1.05;
+            margin-bottom: 22px;
         }
         .guest-loader-spinner {
-            width: 18px;
-            height: 18px;
+            width: 34px;
+            height: 34px;
             border-radius: 50%;
-            border: 2px solid rgba(255,255,255,0.22);
+            border: 3px solid rgba(255,255,255,0.22);
             border-top-color: #ffd76b;
             animation: spinLoader 0.8s linear infinite;
+            flex: 0 0 auto;
         }
         .guest-loader-copy {
             max-width: 860px;
@@ -621,17 +620,11 @@
             margin-bottom: 14px;
         }
         .guest-loader-copy h2 {
-            font-family: var(--font-heading);
-            color: white;
-            font-size: clamp(2.45rem, 5vw, 4.35rem);
-            line-height: 1.08;
-            margin-bottom: 14px;
-        }
-        .guest-loader-raffle-copy {
-            max-width: 720px;
+            font-family: var(--font-body);
             color: rgba(255,255,255,0.72);
-            font-size: clamp(0.82rem, 1.2vw, 1rem);
-            line-height: 1.55;
+            font-size: clamp(0.9rem, 1.4vw, 1.1rem);
+            font-weight: 600;
+            line-height: 1.45;
             margin: 0;
         }
         .guest-loader-testimonials {
@@ -2732,17 +2725,21 @@
     }
 
     .guest-loader-spinner-wrap {
-        font-size: 1rem !important;
+        align-items: flex-start;
+        gap: 10px;
+        font-size: clamp(1.9rem, 10vw, 2.65rem) !important;
+        line-height: 1.02 !important;
         margin-bottom: 16px;
     }
 
-    .guest-loader-copy h2 {
-        font-size: clamp(2rem, 10vw, 2.8rem) !important;
-        line-height: 1.05 !important;
+    .guest-loader-spinner {
+        width: 24px;
+        height: 24px;
+        margin-top: 4px;
     }
 
-    .guest-loader-raffle-copy {
-        font-size: 0.72rem !important;
+    .guest-loader-copy h2 {
+        font-size: 0.82rem !important;
         line-height: 1.45 !important;
     }
 
@@ -2785,7 +2782,7 @@
     }
 
     .guest-loader-copy h2 {
-        font-size: clamp(1.85rem, 11vw, 2.45rem) !important;
+        font-size: 0.78rem !important;
     }
 }
 
