@@ -588,6 +588,7 @@
             this.exclusiveSocialProofInterval = null;
             this.exclusiveLiveWinnersInterval = null;
             this.exclusivePerksWidgetInterval = null;
+            this.exclusivePerksWidgetHideTimer = null;
             this.guestLoaderQuoteInterval = null;
             this.exclusiveHasTriggeredExit = false;
             this.exclusiveBookingConfirmed = false;
@@ -4353,11 +4354,16 @@
         restartExclusivePerksWidgetMotion() {
             const widget = document.getElementById('guestExclusivePerksWidget');
             if (!widget) return;
-            widget.classList.add('is-visible');
+            const flashWidget = () => {
+                widget.classList.add('is-visible');
+                clearTimeout(this.exclusivePerksWidgetHideTimer);
+                this.exclusivePerksWidgetHideTimer = setTimeout(() => {
+                    widget.classList.remove('is-visible');
+                }, window.innerWidth <= 768 ? 5200 : 8000);
+            };
+            flashWidget();
             if (this.exclusivePerksWidgetInterval) clearInterval(this.exclusivePerksWidgetInterval);
-            this.exclusivePerksWidgetInterval = setInterval(() => {
-                widget.classList.toggle('is-visible');
-            }, 8000);
+            this.exclusivePerksWidgetInterval = setInterval(flashWidget, window.innerWidth <= 768 ? 14000 : 16000);
         }
 
         populateExclusiveFilterOptions() {

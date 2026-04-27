@@ -2788,3 +2788,133 @@
         font-size: clamp(1.85rem, 11vw, 2.45rem) !important;
     }
 }
+
+@media (max-width: 768px) {
+    #guestExclusivePage > section.relative,
+    #guestExclusivePage .relative.h-screen {
+        position: relative !important;
+        min-height: auto !important;
+        padding: 14px 12px 16px !important;
+        overflow: hidden !important;
+        background: #fff !important;
+    }
+
+    #guestExclusivePage .slide {
+        display: block !important;
+        opacity: 0 !important;
+        height: 100% !important;
+        min-height: 100% !important;
+        filter: saturate(0.9);
+    }
+
+    #guestExclusivePage .slide.active {
+        opacity: 0.28 !important;
+    }
+
+    #guestExclusivePage .slide-overlay {
+        background: linear-gradient(180deg, rgba(255,255,255,0.86), rgba(255,255,255,0.96)) !important;
+    }
+
+    #guestExclusivePage .text-left,
+    #guestExclusivePage .w-full.lg\\:w-1\\/2:first-child {
+        display: block !important;
+    }
+
+    #guestExclusivePage .max-w-7xl.mx-auto.w-full.relative.z-10.grid {
+        display: block !important;
+    }
+
+    #guestExclusiveHeroTextContainer {
+        min-height: 122px !important;
+        margin-bottom: 8px !important;
+    }
+
+    #guestExclusiveHeroTextContainer h2 {
+        font-size: clamp(1.45rem, 8vw, 2.05rem) !important;
+        line-height: 1.04 !important;
+        margin-bottom: 8px !important;
+        color: #171717 !important;
+    }
+
+    #guestExclusiveHeroTextContainer p {
+        font-size: 0.8rem !important;
+        line-height: 1.35 !important;
+        max-width: 30rem !important;
+        margin-bottom: 10px !important;
+        color: #4b5563 !important;
+    }
+
+    #guestExclusiveHeroTextContainer > div {
+        padding: 9px 11px !important;
+        border-radius: 0 12px 12px 0 !important;
+        margin-bottom: 8px !important;
+    }
+
+    #guestExclusiveHeroTextContainer > div p:first-child {
+        font-size: 0.58rem !important;
+        margin-bottom: 3px !important;
+    }
+
+    #guestExclusiveHeroTextContainer > div p:last-child {
+        font-size: 0.82rem !important;
+        gap: 6px !important;
+    }
+
+    #guestExclusivePage .text-left > .inline-flex:first-child {
+        font-size: 0.56rem !important;
+        padding: 5px 8px !important;
+        margin-bottom: 8px !important;
+    }
+
+    #guestExclusivePage .text-left > .mt-8.glass-light {
+        margin-top: 4px !important;
+        margin-bottom: 10px !important;
+        padding: 8px 10px !important;
+        gap: 8px !important;
+        width: 100% !important;
+    }
+
+    #guestExclusivePage .text-left > .mt-8.glass-light .text-2xl {
+        font-size: 1rem !important;
+    }
+
+    #guestExclusivePage .text-left > .mt-8.glass-light p {
+        font-size: 0.7rem !important;
+        margin: 0 !important;
+    }
+
+    #guestExclusiveHeroVipTimer {
+        font-size: 0.9rem !important;
+    }
+
+    #guestExclusivePerksWidget {
+        display: block !important;
+        left: 10px !important;
+        right: 10px !important;
+        bottom: 12px !important;
+        width: auto !important;
+        max-height: 42vh !important;
+        overflow: hidden !important;
+        padding: 12px !important;
+        border-radius: 18px !important;
+        z-index: 1000 !important;
+        transform: translateY(calc(100% + 18px)) !important;
+    }
+
+    #guestExclusivePerksWidget.is-visible {
+        transform: translateY(0) !important;
+    }
+
+    #guestExclusivePerksWidget [class~="space-y-1.5"] {
+        max-height: 24vh !important;
+    }
+
+    #guestExclusivePerksWidget h4 {
+        font-size: 0.68rem !important;
+    }
+
+    #guestExclusivePerksWidget p,
+    #guestExclusivePerksWidget span {
+        font-size: 0.66rem !important;
+    }
+}
