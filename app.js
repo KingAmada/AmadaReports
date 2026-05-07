@@ -2118,8 +2118,16 @@
                 const memberIdByStaffId = new Map(memberLookupRows.map(row => [row.staff_id, row.id]));
                 const memberIdByEmail = new Map(memberLookupRows.filter(row => row.email).map(row => [String(row.email).toLowerCase(), row.id]));
 
-                await this.syncTableById('properties', this.inventory.map(item => this.mapPropertyToRow(item, hostIdByEmail)).filter(Boolean));
-                await this.syncTableById('bookings', this.transactions.map(item => this.mapBookingToRow(item)));
+                const propertyRows = this.inventory
+                    .map(item => this.mapPropertyToRow(item, hostIdByEmail))
+                    .filter(Boolean);
+                const persistablePropertyIds = new Set(propertyRows.map(row => row.id));
+                const bookingRows = this.transactions
+                    .filter(item => persistablePropertyIds.has(item.propId))
+                    .map(item => this.mapBookingToRow(item));
+
+                await this.syncTableById('properties', propertyRows);
+                await this.syncTableById('bookings', bookingRows);
                 await this.syncTableById('expenditure_requests', this.expenditures.map(item => this.mapExpenditureToRow(item, memberIdByStaffId)));
                 await this.syncTableById('refunds', this.refunds.map(item => this.mapRefundToRow(item, memberIdByStaffId)));
                 await this.syncTableById('salary_registry', this.salaryRegistry.map(item => this.mapSalaryToRow(item, memberIdByEmail)));
@@ -3104,6 +3112,19 @@
         }
 
         deleteProperty(id) {
+            const prop = this.inventory.find(i => i.id === id);
+            if (!prop) return;
+
+            const linkedBookings = this.transactions.filter(tx => tx.propId === id);
+            const linkedRefunds = this.refunds.filter(refund => refund.propId === id);
+            if (linkedBookings.length || linkedRefunds.length) {
+                this.showNotification(
+                    `Cannot delete ${prop.name}. It has ${linkedBookings.length} booking record${linkedBookings.length === 1 ? '' : 's'} attached.`,
+                    "error"
+                );
+                return;
+            }
+
             if(confirm("Are you sure you want to completely delete this listing? This action cannot be undone.")) {
                 this.inventory = this.inventory.filter(i => i.id !== id);
                 this.saveLocalData();
